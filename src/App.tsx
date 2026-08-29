@@ -1,6 +1,8 @@
 import { HashRouter, Routes, Route, NavLink, Outlet } from 'react-router-dom'
 import TodayPage from './today/TodayPage'
 import LibraryPage from './library/LibraryPage'
+import WordListPage from './library/WordListPage'
+import WordDetailPage from './library/WordDetailPage'
 import SettingsPage from './settings/SettingsPage'
 import ImportPage from './importer/ImportPage'
 import ReviewPage from './review/ReviewPage'
@@ -26,7 +28,8 @@ export default function App() {
           <Route path="/" element={<TodayPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/library" element={<LibraryPage />} />
-          <Route path="/library/deck/:deckId" element={<LibraryPage />} />
+          <Route path="/library/deck/:deckId" element={<WordListPage />} />
+          <Route path="/word/:wordId" element={<WordDetailPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
