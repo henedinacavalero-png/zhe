@@ -64,12 +64,12 @@ export default function ReviewPage() {
         {!session.revealed ? (
           <div className="text-center">
             <div className="text-5xl font-bold">{word.term}</div>
-            {word.audio && <button className="mt-3 text-2xl" onClick={(e) => { e.stopPropagation(); playBlob(word.audio!) }}>▶</button>}
+            {word.audio && <button aria-label="播放发音" className="mt-3 text-2xl" onClick={(e) => { e.stopPropagation(); playBlob(word.audio!) }}>▶</button>}
             <div className="mt-6 text-sm text-zinc-400">点击卡片显示答案</div>
           </div>
         ) : (
           <div className="w-full">
-            <CardBack word={word} wordsById={wordsById} onJump={undefined} />
+            <CardBack word={word} wordsById={wordsById} onJump={(id) => nav(`/word/${id}`)} />
           </div>
         )}
       </div>

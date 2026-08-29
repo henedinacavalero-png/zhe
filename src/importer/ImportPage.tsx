@@ -4,7 +4,7 @@ import { parseApkg, type RawNote } from './apkg'
 import { guessMapping, type FieldGuess } from './guess'
 import type { ImportResponse } from './worker'
 
-const LABELS: Record<keyof FieldGuess, string> = { term: '单词', reading: '读音', meaning: '释义', example: '例句', exampleZh: '例句翻译' }
+const LABELS: Record<keyof FieldGuess, string> = { term: '单词', reading: '读音', meaning: '释义', example: '例句', exampleZh: '例句翻译', exampleRt: '例句注音' }
 
 export default function ImportPage() {
   const [guess, setGuess] = useState<FieldGuess | null>(null)

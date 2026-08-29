@@ -1,6 +1,6 @@
 import type { RelatedType, Word } from '../db/types'
 import { playBlob } from '../audio'
-import { alignFurigana } from './furigana'
+import { alignFurigana, alignSentenceReading, isBracketFurigana, parseBracketFurigana } from './furigana'
 
 /** 汉字上方标注假名（ruby）；无读音/纯假名单词原样显示 */
 function Furigana({ term, reading }: { term: string; reading: string }) {
@@ -21,7 +21,33 @@ const GROUPS: { type: RelatedType; label: string; cls: string }[] = [
   { type: 'lesson', label: '同课', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
 ]
 
-function Highlight({ sentence, term }: { sentence: string; term: string }) {
+/** 例句渲染：注音列是"漢字[かな]"格式直接解析（<b> 即目标词）；纯假名整句读音走锚点对齐；
+ *  都没有则仅高亮目标词 */
+function Highlight({ sentence, term, reading }: { sentence: string; term: string; reading?: string }) {
+  if (reading && isBracketFurigana(reading)) {
+    return (<>
+      {parseBracketFurigana(reading).map((p, i) => {
+        const inner = p.rt
+          ? <ruby>{p.text}<rt className="text-[0.55em] font-normal text-zinc-400">{p.rt}</rt></ruby>
+          : p.text
+        return p.mark || p.text.includes(term)
+          ? <mark key={i} className="rounded bg-yellow-200 px-0.5 font-bold">{inner}</mark>
+          : <span key={i}>{inner}</span>
+      })}
+    </>)
+  }
+  if (reading) {
+    return (<>
+      {alignSentenceReading(sentence, reading).map((p, i) => {
+        const inner = p.rt
+          ? <ruby>{p.text}<rt className="text-[0.55em] font-normal text-zinc-400">{p.rt}</rt></ruby>
+          : p.text
+        return p.text.includes(term)
+          ? <mark key={i} className="rounded bg-yellow-200 px-0.5 font-bold">{inner}</mark>
+          : <span key={i}>{inner}</span>
+      })}
+    </>)
+  }
   const idx = sentence.indexOf(term)
   if (idx < 0) return <>{sentence}</>
   return (<>
@@ -49,7 +75,7 @@ export default function CardBack({ word, wordsById, onJump }: {
       {word.examples.length > 0 && (
         <div className="rounded-lg bg-zinc-50 p-3 text-left dark:bg-zinc-800">
           <div className="mb-1 text-[11px] font-bold uppercase text-zinc-400">例句</div>
-          <p className="text-base leading-relaxed"><Highlight sentence={word.examples[0].ja} term={word.term} /></p>
+          <p className="text-base leading-relaxed"><Highlight sentence={word.examples[0].ja} term={word.term} reading={word.examples[0].rt} /></p>
           {word.examples[0].zh && <p className="text-sm text-zinc-500">{word.examples[0].zh}</p>}
         </div>
       )}
