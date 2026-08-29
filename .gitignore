@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 e2e-fail.png
+e2e-*.json
+e2e-fail.png
+tangochou-backup-*.json
