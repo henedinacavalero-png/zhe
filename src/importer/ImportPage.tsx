@@ -10,7 +10,7 @@ export default function ImportPage() {
   const [guess, setGuess] = useState<FieldGuess | null>(null)
   const [fieldNames, setFieldNames] = useState<string[]>([])
   const [skippedNotes, setSkippedNotes] = useState<{ count: number; modelName: string } | null>(null)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [progress, setProgress] = useState<{ phase: 'parse' | 'import'; done: number; total: number } | null>(null)
   const [error, setError] = useState('')
   const fileRef = useRef<File | null>(null)
   const notesRef = useRef<RawNote[] | null>(null)
@@ -42,7 +42,7 @@ export default function ImportPage() {
     if (!guess || !fileRef.current) return
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
     worker.onmessage = (e: MessageEvent<ImportResponse>) => {
-      if (e.data.type === 'progress') setProgress({ done: e.data.done, total: e.data.total })
+      if (e.data.type === 'progress') setProgress({ phase: e.data.phase, done: e.data.done, total: e.data.total })
       if (e.data.type === 'done') { worker.terminate(); navigate(`/library/deck/${e.data.deckId}`) }
       if (e.data.type === 'error') { worker.terminate(); setError(e.data.message) }
     }
@@ -86,7 +86,9 @@ export default function ImportPage() {
             {progress.total > 0 && <div className="h-2 rounded bg-[#3b6ef5] transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />}
           </div>
           <p className="mt-2 text-sm text-zinc-500">
-            {progress.total === 0 ? '正在解析文件（大文件可能需要一到两分钟）…' : `正在导入 ${progress.done} / ${progress.total}`}
+            {progress.phase === 'parse'
+              ? `正在解析音频 ${progress.done} / ${progress.total}…（首次导入大文件约 1-2 分钟，请勿关闭页面）`
+              : `正在导入 ${progress.done} / ${progress.total}`}
           </p>
         </div>
       )}

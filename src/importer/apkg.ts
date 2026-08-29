@@ -12,7 +12,9 @@ const FIELD_SEP = '\x1f'
 // node/jsdom（vitest）走默认路径：node 版胶水用 fs 按包内路径读 wasm，测试不引入变量。
 const IS_NODE = typeof process !== 'undefined' && process.versions?.node != null
 
-export async function parseApkg(file: Blob, opts?: { media?: boolean }): Promise<RawApkg> {
+export interface ParseOptions { media?: boolean; onMediaProgress?: (done: number, total: number) => void }
+
+export async function parseApkg(file: Blob, opts?: ParseOptions): Promise<RawApkg> {
   let zip: JSZip
   try { zip = await JSZip.loadAsync(file) } catch { throw new Error('不是有效的 .apkg 文件（无法解压）') }
 
@@ -34,9 +36,12 @@ export async function parseApkg(file: Blob, opts?: { media?: boolean }): Promise
       try {
         entries = Object.entries(JSON.parse(await mediaManifest.async('string')) as Record<string, string>)
       } catch { /* 媒体清单损坏：按无媒体处理，不阻断词条导入 */ }
+      let done = 0
       for (const [idx, filename] of entries) {
         const f = zip.file(idx)
         if (f) mediaFiles.set(filename, await f.async('blob'))
+        done++
+        if (done % 100 === 0 || done === entries.length) opts?.onMediaProgress?.(done, entries.length)
       }
     }
   }

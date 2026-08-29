@@ -5,7 +5,7 @@ import type { FieldGuess } from './guess'
 
 export interface ImportRequest { file: Blob; guess: FieldGuess; deckName: string; notesOnly?: RawNote[] }
 export type ImportResponse =
-  | { type: 'progress'; done: number; total: number }
+  | { type: 'progress'; phase: 'parse' | 'import'; done: number; total: number }
   | { type: 'done'; deckId: number }
   | { type: 'error'; message: string }
 
@@ -16,13 +16,13 @@ const post = (msg: ImportResponse) =>
 self.onmessage = async (e: MessageEvent<ImportRequest>) => {
   const { file, guess, deckName, notesOnly } = e.data
   try {
-    // total=0 表示"解析文件阶段"（大文件解压+媒体提取可能一两分钟），前端据此显示解析中文案
-    post({ type: 'progress', done: 0, total: 0 })
-    const raw = await parseApkg(file)
+    const raw = await parseApkg(file, {
+      onMediaProgress: (done, total) => post({ type: 'progress', phase: 'parse', done, total }),
+    })
     // 多模型牌组：前端已按模型 0 过滤，此处覆盖 notes，保证实际导入与预览一致
     if (notesOnly) raw.notes = notesOnly
     const deckId = await runImport(raw, guess, deckName, (done, total) =>
-      post({ type: 'progress', done, total }))
+      post({ type: 'progress', phase: 'import', done, total }))
     post({ type: 'done', deckId })
   } catch (err) {
     post({ type: 'error', message: err instanceof Error ? err.message : String(err) })
