@@ -25,11 +25,21 @@ export function review(p: Progress, rating: Rating, now = Date.now()): Progress 
 }
 
 export function pickDailyQueue(
-  words: Word[], progress: Map<number, Progress>, dailyNewLimit: number, now = Date.now(),
+  words: Word[], progress: Map<number, Progress>, dailyNewLimit: number,
+  opts?: { shuffle?: boolean; rng?: () => number; now?: number },
 ): number[] {
+  const now = opts?.now ?? Date.now()
   const due = words
     .filter((w) => { const p = progress.get(w.id!); return p && !p.isNew && p.due <= now })
     .sort((a, b) => progress.get(a.id!)!.due - progress.get(b.id!)!.due)
   const fresh = words.filter((w) => progress.get(w.id!)?.isNew)
+  if (opts?.shuffle) {
+    // Fisher-Yates：新词随机顺序（复习仍按到期时间先后），rng 可注入便于测试
+    const rng = opts.rng ?? Math.random
+    for (let i = fresh.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1))
+      ;[fresh[i], fresh[j]] = [fresh[j], fresh[i]]
+    }
+  }
   return [...due, ...fresh.slice(0, dailyNewLimit)].map((w) => w.id!)
 }

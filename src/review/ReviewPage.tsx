@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { db, bumpStreak, getStreak, getAppSettings } from '../db/db'
+import { db, bumpStreak, getStreak, getAppSettings, candidateKeys, DEFAULT_FILTER } from '../db/db'
 import { pickDailyQueue, review, type Rating } from '../scheduler/scheduler'
 import CardBack from './CardBack'
 import { playBlob } from '../audio'
@@ -28,11 +28,11 @@ export default function ReviewPage() {
   useEffect(() => {
     (async () => {
       const settings = await getAppSettings()
-      // 队列只需要主键：主键直取，避免把上万条含音频的完整词条拉进内存
-      const [keys, prog] = await Promise.all([db.words.toCollection().primaryKeys(), db.progress.toArray()])
+      // 队列只需要主键：按背词范围索引直取（避免整行加载），新词随机顺序
+      const [keys, prog] = await Promise.all([candidateKeys(settings.studyFilter ?? DEFAULT_FILTER), db.progress.toArray()])
       const stubs = keys.map((id) => ({ id })) as unknown as Word[]
       const map = new Map(prog.map((p) => [p.wordId, p]))
-      const ids = pickDailyQueue(stubs, map, settings.dailyNewLimit)
+      const ids = pickDailyQueue(stubs, map, settings.dailyNewLimit, { shuffle: true })
       setWordsById(await loadWords(ids))
       setSession({ ids, idx: 0, revealed: false })
     })()

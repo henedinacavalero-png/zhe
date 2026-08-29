@@ -1,6 +1,7 @@
 import type { RawApkg, RawNote } from './apkg'
 import type { FieldGuess } from './guess'
 import { buildLinks, type WordSeed } from '../linker/linker'
+import { parseLevel } from '../library/level'
 import { newProgress } from '../scheduler/scheduler'
 import { db } from '../db/db'
 import type { Word } from '../db/types'
@@ -28,6 +29,7 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
     const example = guess.example !== null ? cleanField(f[guess.example] ?? '') : ''
     const exampleZh = guess.exampleZh !== null ? cleanField(f[guess.exampleZh] ?? '') : ''
     const exampleRt = guess.exampleRt !== null ? cleanField(f[guess.exampleRt] ?? '') : ''
+    const lv = parseLevel(n.tags[0])
     words.push({
       deckId,
       term,
@@ -38,6 +40,8 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
       audio: null,
       tags: n.tags,
       lesson: n.tags[0] ?? null, // 首个 tag 作为课/分组线索
+      level: lv?.level ?? '',
+      freq: lv?.freq ?? '',
       related: [],
     })
     audioNames.push(extractAudioName(f))

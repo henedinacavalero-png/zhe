@@ -45,6 +45,17 @@ describe('pickDailyQueue', () => {
       [4, P({ wordId: 4, isNew: true })],
       [5, P({ wordId: 5, isNew: true })],
     ])
-    expect(pickDailyQueue(words, prog, 2, now)).toEqual([2, 3, 4]) // 复习 2(已过期)；新词 3、4 命中限量 2；1 未到期排除；5 超限量排除
+    expect(pickDailyQueue(words, prog, 2, { now })).toEqual([2, 3, 4]) // 复习 2(已过期)；新词 3、4 命中限量 2；1 未到期排除；5 超限量排除
+  })
+
+  test('shuffle：新词随机排序（rng 确定性注入），集合不变、限量生效', () => {
+    const words = [1, 2, 3, 4, 5, 6].map(W)
+    const prog = new Map(words.map((w) => [w.id!, P({ wordId: w.id!, isNew: true })]))
+    const seq = [0.1, 0.9, 0.3, 0.5, 0.7]
+    let i = 0
+    const q = pickDailyQueue(words, prog, 4, { shuffle: true, rng: () => seq[i++ % seq.length] })
+    expect(q).toHaveLength(4)
+    expect([...q].sort((a, b) => a - b)).toEqual([2, 3, 4, 6]) // 确定性 rng 下的固定子集
+    expect(q).not.toEqual([1, 2, 3, 4]) // 且不等于原顺序
   })
 })
