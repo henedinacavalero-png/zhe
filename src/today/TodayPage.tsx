@@ -3,23 +3,29 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getAppSettings, getStreak } from '../db/db'
 import { pickDailyQueue } from '../scheduler/scheduler'
 import { useEffect, useState } from 'react'
+import type { Word } from '../db/types'
 
 export default function TodayPage() {
-  const words = useLiveQuery(() => db.words.toArray(), [])
+  // 万级词库只取主键集合（toArray 会把含音频的整行全拉进内存）
+  const wordKeys = useLiveQuery(() => db.words.toCollection().primaryKeys(), [])
   const progress = useLiveQuery(() => db.progress.toArray(), [])
   const [info, setInfo] = useState({ news: 0, due: 0, streakDays: 0 })
   useEffect(() => {
     (async () => {
+      if (wordKeys === undefined || progress === undefined) return
       const s = await getStreak()
       const settings = await getAppSettings()
-      if (words && progress) {
-        const progressMap = new Map(progress.map((p) => [p.wordId, p]))
-        const q = pickDailyQueue(words, progressMap, settings.dailyNewLimit)
-        const news = q.filter((id) => progressMap.get(id)?.isNew).length
-        setInfo({ news, due: q.length - news, streakDays: s.days })
-      }
+      const stubs = wordKeys.map((id) => ({ id })) as unknown as Word[]
+      const progressMap = new Map(progress.map((p) => [p.wordId, p]))
+      const q = pickDailyQueue(stubs, progressMap, settings.dailyNewLimit)
+      const news = q.filter((id) => progressMap.get(id)?.isNew).length
+      setInfo({ news, due: q.length - news, streakDays: s.days })
     })()
-  }, [words, progress])
+  }, [wordKeys, progress])
+
+  if (wordKeys === undefined || progress === undefined) {
+    return <div className="p-8 text-center text-zinc-400">加载中…</div>
+  }
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 p-6">

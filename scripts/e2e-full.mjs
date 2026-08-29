@@ -68,7 +68,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
 
     // 5. 今天页 → 开始背诵
     await page.goto(`${BASE}/#/`)
-    await page.waitForSelector('a:has-text("开始背诵")', { timeout: 30_000 })
+    await page.waitForFunction(() => document.body.innerText.includes('15 个新词'), { timeout: 30_000 })
     const todayText = await page.textContent('body')
     if (!/15 个新词/.test(todayText)) throw new Error('今天页未显示 15 个新词: ' + todayText.slice(0, 200))
     log('[8] 今天页：15 个新词 ✓')
@@ -76,13 +76,17 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
     await page.waitForSelector('text=点击卡片显示答案', { timeout: 60_000 })
     log('[9] 背卡页出现，卡面渲染 ✓')
 
-    // 6. 翻卡：验证背面（读音/释义/相关词）
+    // 6. 翻卡：验证背面（振假名/例句标音/相关词胶囊）
     await page.click('main >> text=点击卡片显示答案')
     await page.waitForSelector('button:has-text("认识")', { timeout: 30_000 })
-    const backText = await page.textContent('body')
-    const hasReading = !/undefined/.test(backText)
-    const hasRelated = backText.includes('相关单词')
-    log('[10] 卡片背面翻开：读音/释义渲染', hasReading ? '✓' : '?', '| 相关单词区', hasRelated ? '✓（首词可能同课兜底）' : '（无）')
+    const chipCount = await page.locator('.rounded-full').count()
+    const exampleRuby = await page.locator('div.rounded-lg ruby').count()
+    const termText = (await page.locator('div.text-4xl').first().innerText()).replace('▶', '').trim()
+    const termHasKanji = /[\u3400-\u9faf]/.test(termText)
+    const termRuby = await page.locator('div.text-4xl ruby').count()
+    log(`[10] 卡片背面：振假名 ${termHasKanji ? (termRuby > 0 ? '✓' : '✗ 缺失') : '本卡无汉字跳过'} | 例句标音 ${exampleRuby > 0 ? '✓' : '✗ 缺失'} | 相关词胶囊 ${chipCount} 个${chipCount > 0 ? ' ✓' : ' ✗ 缺失'} | 当前词: ${termText}`)
+    if (termHasKanji && termRuby === 0) throw new Error('单词振假名缺失')
+    if (chipCount === 0) throw new Error('相关词胶囊缺失')
 
     // 7. 自评两张：认识
     await page.click('button:has-text("认识")')
@@ -96,7 +100,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
 
     // 8. 重新进今天页验证持久化（queue 自动补满 15；streak 写入 IndexedDB 后跨页面仍在）
     await page.goto(`${BASE}/#/`)
-    await page.waitForSelector('text=个新词', { timeout: 30_000 })
+    await page.waitForFunction(() => document.body.innerText.includes('15 个新词'), { timeout: 30_000 })
     const afterReload = await page.textContent('body')
     if (!/15 个新词/.test(afterReload)) throw new Error('未显示 15 个新词: ' + afterReload.slice(0, 200))
     if (!/连续打卡 1 天/.test(afterReload)) throw new Error('打卡未持久化（无"连续打卡 1 天"）')

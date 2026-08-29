@@ -18,7 +18,9 @@ export default function ReviewPage() {
   const [wordsById, setWordsById] = useState<Map<number, Word>>(new Map())
 
   async function loadWords(ids: number[]) {
+    // 全词库轻量副本（剥音频防内存膨胀）供相关词胶囊查词；当日队列词再覆盖为完整版（含音频/例句）
     const m = new Map<number, Word>()
+    await db.words.each((w) => { if (w.id != null) m.set(w.id, { ...w, audio: null }) })
     for (const id of ids) { const w = await db.words.get(id); if (w) m.set(id, w) }
     return m
   }
@@ -26,9 +28,11 @@ export default function ReviewPage() {
   useEffect(() => {
     (async () => {
       const settings = await getAppSettings()
-      const [words, prog] = await Promise.all([db.words.toArray(), db.progress.toArray()])
+      // 队列只需要主键：主键直取，避免把上万条含音频的完整词条拉进内存
+      const [keys, prog] = await Promise.all([db.words.toCollection().primaryKeys(), db.progress.toArray()])
+      const stubs = keys.map((id) => ({ id })) as unknown as Word[]
       const map = new Map(prog.map((p) => [p.wordId, p]))
-      const ids = pickDailyQueue(words, map, settings.dailyNewLimit)
+      const ids = pickDailyQueue(stubs, map, settings.dailyNewLimit)
       setWordsById(await loadWords(ids))
       setSession({ ids, idx: 0, revealed: false })
     })()
