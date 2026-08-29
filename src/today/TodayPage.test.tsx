@@ -14,6 +14,9 @@ beforeEach(async () => {
 const W = (id: number, term = '', level = '', freq = ''): Word =>
   ({ id, deckId: 1, term, reading: '', meaning: '', pos: '', examples: [], audio: null, tags: [], lesson: null, level, freq, related: [] })
 
+// 新版今天页把大数字单独渲染在 .text-5xl 元素里
+const bigNum = (n: string) => expect(screen.getByText(n, { selector: '.text-5xl' })).toBeInTheDocument()
+
 test('显示今日待背数量（2 复习 + 1 新词，限量 15）', async () => {
   await db.words.bulkAdd([W(1), W(2), W(3)])
   await db.progress.bulkPut([
@@ -22,14 +25,15 @@ test('显示今日待背数量（2 复习 + 1 新词，限量 15）', async () =
     newProgress(3),
   ])
   render(<MemoryRouter><TodayPage /></MemoryRouter>)
-  expect(await screen.findByText(/1 个新词/)).toBeInTheDocument()
-  expect(await screen.findByText(/1 个待复习/)).toBeInTheDocument()
+  await waitFor(() => bigNum('1'))
+  expect(screen.getByText('个新词待认')).toBeInTheDocument()
+  expect(screen.getByText('复习', { exact: false })).toBeInTheDocument()
 })
 
 test('有打卡记录时显示连续打卡天数', async () => {
   await db.settings.put({ key: 'streak', days: 3, lastStudyDate: '2026-08-29' })
   render(<MemoryRouter><TodayPage /></MemoryRouter>)
-  expect(await screen.findByText(/连续打卡 3 天/)).toBeInTheDocument()
+  expect(await screen.findByText(/连续 3 天/)).toBeInTheDocument()
 })
 
 test('级别 chips 带词数；选 N3 后频率行出现且队列只含 N3', async () => {
@@ -39,16 +43,16 @@ test('级别 chips 带词数；选 N3 后频率行出现且队列只含 N3', asy
 
   const n5 = await screen.findByText('N5', { selector: 'button' })
   await waitFor(() => expect(n5.textContent).toContain('2'))
-  await waitFor(() => expect(screen.getByText(/个新词/).textContent).toMatch(/^4 个新词$/))
+  await waitFor(() => bigNum('4'))
 
   fireEvent.click(screen.getByText('N3', { selector: 'button' }))
   expect(await screen.findByText('高频', { selector: 'button' })).toBeInTheDocument()
-  await waitFor(() => expect(screen.getByText(/个新词/).textContent).toMatch(/^2 个新词$/))
+  await waitFor(() => bigNum('2'))
 
   fireEvent.click(screen.getByText('低频', { selector: 'button' }))
-  await waitFor(() => expect(screen.getByText(/个新词/).textContent).toMatch(/^1 个新词$/))
+  await waitFor(() => bigNum('1'))
   fireEvent.click(screen.getByText('高频', { selector: 'button' }))
-  await waitFor(() => expect(screen.getByText(/个新词/).textContent).toMatch(/^1 个新词$/))
+  await waitFor(() => bigNum('1'))
 
   // 选没有词的 N2 → 空态
   fireEvent.click(screen.getByText('N2', { selector: 'button' }))
@@ -60,6 +64,6 @@ test('N5 无频率档：不出现频率行，队列只含 N5', async () => {
   await db.progress.bulkPut([newProgress(1), newProgress(2), newProgress(3)])
   render(<MemoryRouter><TodayPage /></MemoryRouter>)
   fireEvent.click(await screen.findByText('N5', { selector: 'button' }))
-  await waitFor(() => expect(screen.getByText(/个新词/).textContent).toMatch(/^2 个新词$/))
+  await waitFor(() => bigNum('2'))
   expect(screen.queryByText('高频', { selector: 'button' })).not.toBeInTheDocument()
 })

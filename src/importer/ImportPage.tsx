@@ -66,24 +66,24 @@ export default function ImportPage() {
         </p>
       )}
       {guess && !progress && (
-        <div className="space-y-2">
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-[0_4px_14px_rgba(15,23,42,0.05)] dark:bg-zinc-800">
           <p className="text-sm text-zinc-500">确认各部分对应的字段（可修改）：</p>
           {(Object.keys(LABELS) as (keyof FieldGuess)[]).map((part) => (
-            <label key={part} className="flex items-center gap-2">
-              <span className="w-12">{LABELS[part]}</span>
-              <select className="rounded border p-1" value={guess[part] ?? ''} onChange={(e) => setPart(part, e.target.value)}>
+            <label key={part} className="flex items-center gap-3">
+              <span className="w-16 text-sm">{LABELS[part]}</span>
+              <select className="flex-1 rounded-lg border border-zinc-200 p-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-700" value={guess[part] ?? ''} onChange={(e) => setPart(part, e.target.value)}>
                 <option value="">（无）</option>
                 {fieldNames.map((f, i) => <option key={i} value={i}>{f}</option>)}
               </select>
             </label>
           ))}
-          <button className="w-full rounded bg-[#3b6ef5] py-2 font-bold text-white" onClick={startImport}>开始导入</button>
+          <button className="w-full rounded-full bg-gradient-to-r from-[#3b6ef5] to-[#6366f1] py-2.5 font-bold text-white shadow-[0_8px_20px_rgba(59,110,245,0.35)]" onClick={startImport}>开始导入</button>
         </div>
       )}
       {progress && (
-        <div>
-          <div className="h-2 rounded bg-zinc-200">
-            {progress.total > 0 && <div className="h-2 rounded bg-[#3b6ef5] transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />}
+        <div className="rounded-2xl bg-white p-4 shadow-[0_4px_14px_rgba(15,23,42,0.05)] dark:bg-zinc-800">
+          <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-700">
+            {progress.total > 0 && <div className="h-2 rounded-full bg-gradient-to-r from-[#3b6ef5] to-[#6366f1] transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />}
           </div>
           <p className="mt-2 text-sm text-zinc-500">
             {progress.phase === 'parse'

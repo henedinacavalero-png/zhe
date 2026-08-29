@@ -7,9 +7,9 @@ import { playBlob } from '../audio'
 import type { Word } from '../db/types'
 
 const BUTTONS: { rating: Rating; label: string; cls: string }[] = [
-  { rating: 'again', label: '😭 不认识', cls: 'bg-red-50 text-red-600' },
-  { rating: 'hard', label: '😐 模糊', cls: 'bg-amber-50 text-amber-600' },
-  { rating: 'good', label: '😊 认识', cls: 'bg-emerald-50 text-emerald-600' },
+  { rating: 'again', label: '😤 不认识', cls: 'bg-[#feecec] text-[#dc2626] shadow-[0_3px_10px_rgba(220,38,38,0.12)] dark:bg-red-900/30 dark:text-red-300' },
+  { rating: 'hard', label: '😐 模糊', cls: 'bg-[#fef6e0] text-[#d97706] shadow-[0_3px_10px_rgba(217,119,6,0.12)] dark:bg-amber-900/30 dark:text-amber-300' },
+  { rating: 'good', label: '😊 认识', cls: 'bg-[#e5f3eb] text-[#059669] shadow-[0_3px_10px_rgba(5,150,105,0.12)] dark:bg-emerald-900/30 dark:text-emerald-300' },
 ]
 
 export default function ReviewPage() {
@@ -61,18 +61,30 @@ export default function ReviewPage() {
 
   return (
     <div className="flex h-full flex-col p-4">
-      <div className="mb-2 text-center text-sm text-zinc-400">{session.idx + 1} / {session.ids.length}</div>
-      <div className="h-1 rounded bg-zinc-200"><div className="h-1 rounded bg-[#3b6ef5]" style={{ width: `${((session.idx) / session.ids.length) * 100}%` }} /></div>
+      <div className="mb-2 flex items-center gap-3">
+        <span className="text-xs font-bold text-zinc-400">{session.idx + 1} / {session.ids.length}</span>
+        {/* 分段进度：每张卡一格 */}
+        <div className="flex flex-1 gap-1">
+          {session.ids.map((_, i) => (
+            <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${
+              i < session.idx ? 'bg-[#3b6ef5]' : i === session.idx ? 'bg-[#3b6ef5]/50' : 'bg-zinc-200 dark:bg-zinc-700'}`} />
+          ))}
+        </div>
+      </div>
       <div className="flex flex-1 cursor-pointer flex-col items-center justify-center"
         onClick={() => setSession({ ...session, revealed: true })}>
         {!session.revealed ? (
-          <div className="text-center">
-            <div className="text-5xl font-bold">{word.term}</div>
-            {word.audio && <button aria-label="播放发音" className="mt-3 text-2xl" onClick={(e) => { e.stopPropagation(); playBlob(word.audio!) }}>▶</button>}
-            <div className="mt-6 text-sm text-zinc-400">点击卡片显示答案</div>
+          <div key={session.idx} className="animate-pop w-full rounded-3xl bg-white py-14 text-center shadow-[0_8px_24px_rgba(15,23,42,0.08)] dark:bg-zinc-800">
+            <div className="text-5xl font-bold text-slate-800 dark:text-zinc-100">{word.term}</div>
+            {word.audio && (
+              <button aria-label="播放发音"
+                className="mt-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-xl text-[#3b6ef5] shadow-[0_4px_12px_rgba(59,110,245,0.2)]"
+                onClick={(e) => { e.stopPropagation(); playBlob(word.audio!) }}>▶</button>
+            )}
+            <div className="mt-8 text-sm text-zinc-400">点击卡片显示答案</div>
           </div>
         ) : (
-          <div className="w-full">
+          <div key={session.idx} className="animate-fade-up w-full">
             <CardBack word={word} wordsById={wordsById} onJump={(id) => nav(`/word/${id}`)} />
           </div>
         )}
@@ -80,7 +92,7 @@ export default function ReviewPage() {
       {session.revealed && (
         <div className="flex gap-2 pb-2">
           {BUTTONS.map((b) => (
-            <button key={b.rating} className={`flex-1 rounded-lg py-3 font-bold ${b.cls}`} onClick={() => onRate(b.rating)}>{b.label}</button>
+            <button key={b.rating} className={`flex-1 rounded-xl py-3 font-bold ${b.cls}`} onClick={() => onRate(b.rating)}>{b.label}</button>
           ))}
         </div>
       )}

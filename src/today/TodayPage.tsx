@@ -19,12 +19,17 @@ const HAS_FREQ: Record<string, boolean> = { N1: true, N2: true, N3: true }
 function Chip({ active, label, count, onClick }: { active: boolean; label: string; count?: number; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-        active ? 'border-[#3b6ef5] bg-[#3b6ef5] font-bold text-white' : 'border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300'}`}>
+      className={`rounded-full px-3 py-1.5 text-xs transition-colors ${
+        active
+          ? 'bg-[#3b6ef5] font-bold text-white shadow-[0_4px_12px_rgba(59,110,245,.35)]'
+          : 'border border-zinc-200/80 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'}`}>
       {label}{count !== undefined && <span className="ml-1 opacity-70">{count}</span>}
     </button>
   )
 }
+
+const today = new Date()
+const DATE_STR = `${today.getMonth() + 1}月${today.getDate()}日`
 
 export default function TodayPage() {
   const { settings, setStudyFilter } = useSettings()
@@ -37,7 +42,7 @@ export default function TodayPage() {
   useEffect(() => {
     (async () => {
       const all = await db.words.count()
-      const c: Record<string, number> = { all: all }
+      const c: Record<string, number> = { all }
       for (const lv of ['N5', 'N4', 'N3', 'N2', 'N1']) c[lv] = await db.words.where('level').equals(lv).count()
       setCounts(c)
     })()
@@ -51,7 +56,7 @@ export default function TodayPage() {
       for (const f of ['高频', '中频', '低频'] as Freq[]) {
         c[f] = await db.words.where('[level+freq]').equals([filter.level, f]).count()
       }
-      setCounts((prev) => ({ ...prev, [filter.level]: c.all, [`${filter.level}:freq`]: 0, ...c }))
+      setCounts((prev) => ({ ...prev, [filter.level]: c.all, ...c }))
     })()
   }, [filter.level])
 
@@ -70,19 +75,32 @@ export default function TodayPage() {
     })()
   }, [filter, progress])
 
+  const levelLabel = filter.level === 'all' ? '全部范围' : filter.level + (filter.freq !== 'all' ? ` · ${filter.freq}` : '')
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 p-4">
-      <div className="text-center">
-        <div className="text-sm text-zinc-400">今天</div>
-        <div className="mt-2 rounded-2xl bg-indigo-50 px-10 py-6 dark:bg-zinc-800">
-          {/* “N 个新词”须为同一文本节点（getByText 只匹配元素的直接文本子节点） */}
-          <div className="text-4xl font-bold text-[#3b6ef5]">{info.ready ? info.news : '…'} 个新词</div>
-          <div className="mt-1 text-sm text-zinc-500">{info.ready ? info.due : '…'} 个待复习</div>
+      <div className="w-full max-w-sm text-center">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-lg font-extrabold text-slate-700 dark:text-zinc-100">今天 <span className="text-xs font-normal text-zinc-400">{DATE_STR}</span></div>
+          {info.streakDays > 0 && (
+            <span className="rounded-full bg-[#fff3e8] px-2.5 py-1 text-xs font-bold text-[#ea7c30] dark:bg-orange-900/40 dark:text-orange-300">
+              🔥 连续 {info.streakDays} 天
+            </span>
+          )}
         </div>
-        {info.streakDays > 0 && <div className="mt-3 text-sm text-orange-500">🔥 连续打卡 {info.streakDays} 天</div>}
+
+        <div className="animate-pop rounded-3xl bg-white p-5 shadow-[0_6px_18px_rgba(59,110,245,0.10)] dark:bg-zinc-800">
+          <div className="text-xs text-zinc-400">{levelLabel} · 今天的任务</div>
+          <div className="text-5xl font-black leading-tight text-[#3b6ef5]">{info.ready ? info.news : '…'}</div>
+          <div className="-mt-1 text-xs text-zinc-500">个新词待认</div>
+          <div className="mt-3 flex justify-around rounded-xl bg-[#f1f5fd] px-2 py-2 text-xs text-slate-600 dark:bg-zinc-700/60 dark:text-zinc-300">
+            <span>📖 复习 <b>{info.ready ? info.due : '…'}</b></span>
+            <span>✨ 新词 <b>{info.ready ? info.news : '…'}</b></span>
+          </div>
+        </div>
       </div>
 
-      <div className="w-full max-w-md space-y-2">
+      <div className="w-full max-w-sm space-y-2">
         <div className="flex flex-wrap justify-center gap-2">
           {LEVELS.map((lv) => (
             <Chip key={lv.key} label={lv.label} count={counts[lv.key]}
@@ -101,7 +119,8 @@ export default function TodayPage() {
         )}
       </div>
 
-      <Link to="/review" className="w-full max-w-xs rounded-full bg-[#3b6ef5] py-3 text-center font-bold text-white">
+      <Link to="/review"
+        className="w-full max-w-sm rounded-full bg-gradient-to-r from-[#3b6ef5] to-[#6366f1] py-3 text-center font-bold text-white shadow-[0_8px_20px_rgba(59,110,245,0.35)]">
         {info.news + info.due > 0 ? '开始背诵 →' : '这个范围今天背完了 🎉'}
       </Link>
     </div>
