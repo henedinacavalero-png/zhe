@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* class 策略的 dark 模式（Tailwind v4 官方写法）：html.dark 时启用 dark: 变体 */
+@custom-variant dark (&:where(.dark, .dark *));
