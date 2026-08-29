@@ -32,6 +32,11 @@ describe('parseApkg', () => {
     await expect(parseApkg(new Blob(['not a zip']))).rejects.toThrow(/不是有效的/)
   })
 
+  test('collection.anki2 存在但内容非法：报已损坏', async () => {
+    const zip = new JSZip(); zip.file('collection.anki2', 'not a sqlite database')
+    await expect(parseApkg(await zip.generateAsync({ type: 'blob' }))).rejects.toThrow(/已损坏/)
+  })
+
   test('新版加密格式 anki21b：提示重新导出', async () => {
     const zip = new JSZip(); zip.file('collection.anki21b', new Uint8Array([1]))
     await expect(parseApkg(await zip.generateAsync({ type: 'blob' }))).rejects.toThrow(/重新导出/)
