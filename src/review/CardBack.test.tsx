@@ -23,3 +23,15 @@ test('关联词按类型分组渲染为三组', () => {
   expect(screen.getByText('同课')).toBeInTheDocument()
   expect(screen.getByText('食事')).toBeInTheDocument()
 })
+
+test('汉字上方显示假名注音（ruby），纯假名单词不加注音', () => {
+  render(<CardBack word={word} wordsById={new Map()} onJump={undefined as never} />)
+  const ruby = screen.getByText('食', { selector: 'ruby' })
+  expect(ruby).toBeInTheDocument()
+  expect(ruby.querySelector('rt')?.textContent).toBe('た')
+})
+
+test('有音频时显示播放按钮', () => {
+  render(<CardBack word={{ ...word, audio: new Blob(['x']) }} wordsById={new Map()} onJump={undefined as never} />)
+  expect(screen.getByLabelText('播放发音')).toBeInTheDocument()
+})

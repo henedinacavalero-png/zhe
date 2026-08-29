@@ -1,5 +1,19 @@
 import type { RelatedType, Word } from '../db/types'
 import { playBlob } from '../audio'
+import { alignFurigana } from './furigana'
+
+/** 汉字上方标注假名（ruby）；无读音/纯假名单词原样显示 */
+function Furigana({ term, reading }: { term: string; reading: string }) {
+  return (
+    <>
+      {alignFurigana(term, reading).map((p, i) =>
+        p.rt
+          ? <ruby key={i}>{p.text}<rt className="text-[0.4em] font-normal text-zinc-400">{p.rt}</rt></ruby>
+          : <span key={i}>{p.text}</span>,
+      )}
+    </>
+  )
+}
 
 const GROUPS: { type: RelatedType; label: string; cls: string }[] = [
   { type: 'kanji', label: '同汉字', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -24,12 +38,12 @@ export default function CardBack({ word, wordsById, onJump }: {
     <div className="space-y-4 text-center">
       <div>
         <div className="text-4xl font-bold">
-          {word.term}
+          <Furigana term={word.term} reading={word.reading} />
           {word.audio && (
             <button aria-label="播放发音" className="ml-2 align-middle text-2xl text-[#3b6ef5]" onClick={() => playBlob(word.audio!)}>▶</button>
           )}
         </div>
-        <div className="text-zinc-500">{word.reading} {word.pos && <span className="ml-1 rounded bg-indigo-50 px-1 text-xs text-indigo-600">{word.pos}</span>}</div>
+        {word.pos && <div className="text-zinc-500"><span className="rounded bg-indigo-50 px-1 text-xs text-indigo-600">{word.pos}</span></div>}
         <div className="mt-1 text-lg"><strong>{word.meaning}</strong></div>
       </div>
       {word.examples.length > 0 && (
