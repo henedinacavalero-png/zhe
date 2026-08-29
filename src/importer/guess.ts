@@ -1,7 +1,7 @@
 export interface FieldGuess { term: number; reading: number | null; meaning: number; example: number | null }
 
-const KANA_RE = /^[\u3040-\u309f\u30fc\u3005]+$/
-const HAS_KANA_RE = /[\u3040-\u309f]/
+const KANA_RE = /^[\u3040-\u309f\u30a0-\u30ff\u30fc\u3005]+$/ // 含平假名 + 片假名 + 长音符 + 〆
+const HAS_KANA_RE = /[\u3040-\u309f\u30a0-\u30ff]/
 const HAS_KANJI_RE = /[\u3400-\u9faf]/
 const SENTENCE_END_RE = /[。！？.]$/
 

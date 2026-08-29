@@ -15,3 +15,10 @@ test('没有例句列时 example 为 null；无假名列时 reading 为 null', (
   const sample = [['食べる', '吃'], ['飲む', '喝']]
   expect(guessMapping(['単語', '意味'], sample)).toEqual({ term: 0, reading: null, meaning: 1, example: null })
 })
+
+test('片假名读音列被识别（外来语）', () => {
+  // 全片假名读音列：reading=0 是核心断言；term 落点以 guessMapping 实际输出为准——
+  // 「苹果」含汉字故 term 猜为 1，candidates 中只剩该列，meaning 也落到 1（与 term 同列，见 guess.ts 收尾逻辑）
+  const sample = [['リンゴ', '苹果'], ['ペン', '笔']]
+  expect(guessMapping(['よみ', '意味'], sample)).toEqual({ term: 1, reading: 0, meaning: 1, example: null })
+})

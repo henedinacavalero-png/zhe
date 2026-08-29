@@ -39,8 +39,9 @@ export default function ReviewPage() {
     const wordId = session.ids[session.idx]
     const p = await db.progress.get(wordId)
     if (p) await db.progress.put(review(p, rating))
+    // 每次评分即打卡（规格 §7：当日完成 ≥1 张即计），bumpStreak 同日幂等（db.ts），中途退出也计入当天
+    await bumpStreak(new Date().toISOString().slice(0, 10))
     if (session.idx + 1 >= session.ids.length) {
-      await bumpStreak(new Date().toISOString().slice(0, 10))
       const s = await getStreak()
       nav('/', { state: { finished: true, streakDays: s.days } })
     } else {

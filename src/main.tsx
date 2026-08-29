@@ -15,10 +15,19 @@ function applyTheme(theme: 'light' | 'dark' | 'auto' | undefined): void {
 useSettings.subscribe((s) => applyTheme(s.settings?.theme))
 mq.addEventListener('change', () => applyTheme(useSettings.getState().settings?.theme))
 
-void loadSettings().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-})
+void loadSettings()
+  .then(() => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+  })
+  // IndexedDB 打不开（隐私模式/存储被禁）时降级兜底：渲染零依赖 IndexedDB 的最小提示页，避免永久白屏
+  .catch(() => {
+    createRoot(document.getElementById('root')!).render(
+      <div className="flex h-screen items-center justify-center p-6 text-center text-zinc-500">
+        无法访问本地存储。请检查浏览器是否处于隐私模式或已禁用存储。
+      </div>,
+    )
+  })
