@@ -3,6 +3,7 @@ import TodayPage from './today/TodayPage'
 import LibraryPage from './library/LibraryPage'
 import SettingsPage from './settings/SettingsPage'
 import ImportPage from './importer/ImportPage'
+import ReviewPage from './review/ReviewPage'
 
 function Shell() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
       <Routes>
         <Route element={<Shell />}>
           <Route path="/" element={<TodayPage />} />
+          <Route path="/review" element={<ReviewPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/library/deck/:deckId" element={<LibraryPage />} />
           <Route path="/import" element={<ImportPage />} />
