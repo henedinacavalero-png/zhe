@@ -16,6 +16,8 @@ const post = (msg: ImportResponse) =>
 self.onmessage = async (e: MessageEvent<ImportRequest>) => {
   const { file, guess, deckName, notesOnly } = e.data
   try {
+    // total=0 表示"解析文件阶段"（大文件解压+媒体提取可能一两分钟），前端据此显示解析中文案
+    post({ type: 'progress', done: 0, total: 0 })
     const raw = await parseApkg(file)
     // 多模型牌组：前端已按模型 0 过滤，此处覆盖 notes，保证实际导入与预览一致
     if (notesOnly) raw.notes = notesOnly

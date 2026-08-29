@@ -22,3 +22,18 @@ test('片假名读音列被识别（外来语）', () => {
   const sample = [['リンゴ', '苹果'], ['ペン', '笔']]
   expect(guessMapping(['よみ', '意味'], sample)).toEqual({ term: 1, reading: 0, meaning: 1, example: null })
 })
+
+test('例句尾部带 [sound:] 音频标签时仍被识别为例句', () => {
+  const sample = [['食べる', '吃', '朝ごはんを食べる。[sound:ex1.mp3]'], ['飲む', '喝', 'コーヒーを飲む。[sound:ex2.mp3]']]
+  expect(guessMapping(['単語', '意味', '例文'], sample)).toEqual({ term: 0, reading: null, meaning: 1, example: 2 })
+})
+
+test('含中文（有汉字无假名）的列优先判定为释义，数字编号列不被选为释义', () => {
+  // 模拟真实 JLPT 牌组：NoteID 数字列在前，VocabKanji 混合列为单词，VocabDefSC 纯中文释义
+  const fieldNames = ['NoteID', 'VocabKanji', 'VocabFurigana', 'VocabDefSC', 'SentKanji1']
+  const sample = [
+    ['12345', '食べる', 'たべる', '吃；进食', '朝ごはんを食べる。[sound:s1.mp3]'],
+    ['12346', '飲む', 'のむ', '喝', 'コーヒーを飲む。[sound:s2.mp3]'],
+  ]
+  expect(guessMapping(fieldNames, sample)).toEqual({ term: 1, reading: 2, meaning: 3, example: 4 })
+})

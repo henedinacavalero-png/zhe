@@ -23,7 +23,9 @@ export default function ImportPage() {
     setProgress(null)
     setSkippedNotes(null)
     try {
-      const raw = await parseApkg(f)
+      // 预览阶段跳过媒体提取：大文件（上百 MB、上万个媒体）在主线程逐个解 Blob 会冻结页面；
+      // 完整媒体由 worker 在"开始导入"后自行解析
+      const raw = await parseApkg(f, { media: false })
       const model = raw.models[0]
       if (!model) throw new Error('牌组里没有笔记模型')
       // 多模型牌组防错位：只保留模型 0 的笔记（其他模板字段数不同，按模型 0 列索引切分会张冠李戴）
@@ -80,8 +82,12 @@ export default function ImportPage() {
       )}
       {progress && (
         <div>
-          <div className="h-2 rounded bg-zinc-200"><div className="h-2 rounded bg-[#3b6ef5] transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} /></div>
-          <p className="mt-2 text-sm text-zinc-500">正在导入 {progress.done} / {progress.total}</p>
+          <div className="h-2 rounded bg-zinc-200">
+            {progress.total > 0 && <div className="h-2 rounded bg-[#3b6ef5] transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />}
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">
+            {progress.total === 0 ? '正在解析文件（大文件可能需要一到两分钟）…' : `正在导入 ${progress.done} / ${progress.total}`}
+          </p>
         </div>
       )}
     </div>
