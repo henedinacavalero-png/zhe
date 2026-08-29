@@ -26,13 +26,14 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
     const term = cleanField(f[guess.term] ?? '')
     if (term === '') continue
     const example = guess.example !== null ? cleanField(f[guess.example] ?? '') : ''
+    const exampleZh = guess.exampleZh !== null ? cleanField(f[guess.exampleZh] ?? '') : ''
     words.push({
       deckId,
       term,
       reading: guess.reading !== null ? cleanField(f[guess.reading] ?? '') : '',
       meaning: cleanField(f[guess.meaning] ?? ''),
       pos: n.tags.find((t) => /動|名|形|副|助|接/i.test(t)) ?? '',
-      examples: example ? [{ ja: example, zh: '' }] : [],
+      examples: example ? [{ ja: example, zh: exampleZh }] : [],
       audio: null,
       tags: n.tags,
       lesson: n.tags[0] ?? null, // 首个 tag 作为课/分组线索

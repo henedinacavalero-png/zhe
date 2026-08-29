@@ -5,7 +5,7 @@ import { db } from '../db/db'
 import type { Word } from '../db/types'
 
 const note: RawNote = { mid: 1, fields: ['食べる', 'たべる', '吃 [sound:pop.mp3]', '朝ごはんを食べる。'], tags: ['JLPT::N4'] }
-const GUESS = { term: 0, reading: 1, meaning: 2, example: 3 } as const
+const GUESS = { term: 0, reading: 1, meaning: 2, example: 3, exampleZh: null } as const
 
 describe('runImport 管线', () => {
   test('extractAudioName 从任意字段提取 [sound:xxx]', () => {
@@ -23,7 +23,7 @@ describe('runImport 管线', () => {
   })
 
   test('buildWords：无例句列 → examples 为空数组', () => {
-    const { words } = buildWords([note], { term: 0, reading: 1, meaning: 2, example: null }, 7)
+    const { words } = buildWords([note], { term: 0, reading: 1, meaning: 2, example: null, exampleZh: null }, 7)
     expect(words[0].examples).toEqual([])
   })
 
@@ -55,7 +55,7 @@ describe('runImport 管线', () => {
     }
     const calls: [number, number][] = []
     const deckId = await runImport(
-      raw, { term: 0, reading: 1, meaning: 2, example: null }, '测试牌组',
+      raw, { term: 0, reading: 1, meaning: 2, example: null, exampleZh: null }, '测试牌组',
       (done, total) => calls.push([done, total]),
     )
     expect(deckId).toBeGreaterThan(0)
