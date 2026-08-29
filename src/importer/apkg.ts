@@ -1,11 +1,16 @@
 import JSZip from 'jszip'
 import initSqlJs from 'sql.js'
+import sqlWasmUrl from 'sql.js/dist/sql-wasm-browser.wasm?url'
 
 export interface RawModel { id: number; name: string; fieldNames: string[] }
 export interface RawNote { mid: number; fields: string[]; tags: string[] }
 export interface RawApkg { models: RawModel[]; notes: RawNote[]; mediaFiles: Map<string, Blob> }
 
 const FIELD_SEP = '\x1f'
+
+// 打包后 emscripten 胶水按"脚本目录"推 wasm 路径，必然 404；浏览器改用 Vite 发行的资产 URL。
+// node/jsdom（vitest）走默认路径：node 版胶水用 fs 按包内路径读 wasm，测试不引入变量。
+const IS_NODE = typeof process !== 'undefined' && process.versions?.node != null
 
 export async function parseApkg(file: Blob): Promise<RawApkg> {
   let zip: JSZip
@@ -17,7 +22,7 @@ export async function parseApkg(file: Blob): Promise<RawApkg> {
   const collection = zip.file('collection.anki2') ?? zip.file('collection.anki21')
   if (!collection) throw new Error('不是有效的 .apkg 文件（缺少牌组数据库）')
 
-  const SQL = await initSqlJs()
+  const SQL = await initSqlJs(IS_NODE ? undefined : { locateFile: () => sqlWasmUrl })
 
   const mediaFiles = new Map<string, Blob>()
   const mediaManifest = zip.file('media')

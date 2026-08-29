@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, NavLink, Outlet } from 'react-router-dom'
 import TodayPage from './today/TodayPage'
 import LibraryPage from './library/LibraryPage'
 import SettingsPage from './settings/SettingsPage'
+import ImportPage from './importer/ImportPage'
 
 function Shell() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/" element={<TodayPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/library/deck/:deckId" element={<LibraryPage />} />
+          <Route path="/import" element={<ImportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
