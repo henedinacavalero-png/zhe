@@ -120,15 +120,26 @@ export default function CardBack({ word, wordsById, onJump }: {
         <WordImages images={word.images} />
       </div>
 
-      {word.examples.length > 0 && (
-        <div className="rounded-r-xl rounded-l-sm border-l-[3px] border-[#3b6ef5] bg-[#f6f8ff] p-3 text-left dark:bg-zinc-700/50">
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-zinc-400">例句</div>
-          {word.examples[0].rt
-            ? <p className="text-base leading-loose"><Highlight sentence={word.examples[0].ja} term={word.term} reading={word.examples[0].rt} /></p>
-            : <p className="text-base leading-loose"><AnkiText text={word.examples[0].ja} resolve={resolve} term={word.term} ruby /></p>}
-          {word.examples[0].zh && <p className="mt-1 text-sm text-zinc-500">{word.examples[0].zh}</p>}
-        </div>
-      )}
+      {word.examples.length > 0 && (() => {
+        // 例句自带音频（如例句跟读牌组）：优先用 word.media 里的 Blob；与主音频同名时直接用 word.audio
+        const an = word.examples[0].audioName
+        const exBlob = an ? resolve.media?.[an] ?? (resolve.audio?.name === an ? resolve.audio!.blob : undefined) : undefined
+        return (
+          <div className="rounded-r-xl rounded-l-sm border-l-[3px] border-[#3b6ef5] bg-[#f6f8ff] p-3 text-left dark:bg-zinc-700/50">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">例句</div>
+              {exBlob && (
+                <button aria-label="播放例句" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm text-[#3b6ef5] shadow-sm dark:bg-zinc-800"
+                  onClick={() => playBlob(exBlob)}>🔊</button>
+              )}
+            </div>
+            {word.examples[0].rt
+              ? <p className="text-base leading-loose"><Highlight sentence={word.examples[0].ja} term={word.term} reading={word.examples[0].rt} /></p>
+              : <p className="text-base leading-loose"><AnkiText text={word.examples[0].ja} resolve={resolve} term={word.term} ruby /></p>}
+            {word.examples[0].zh && <p className="mt-1 text-sm text-zinc-500">{word.examples[0].zh}</p>}
+          </div>
+        )
+      })()}
 
       {/* 全字段完整展示：这张卡的所有内容按原模板区块列出 */}
       {sections.map((s, i) => (

@@ -1,5 +1,5 @@
 export interface Deck { id?: number; name: string; importedAt: number; wordCount: number }
-export interface Example { ja: string; zh: string; rt?: string } // rt = 例句整句读音（假名），用于例句汉字标音
+export interface Example { ja: string; zh: string; rt?: string; audioName?: string } // rt = 例句整句读音（假名）；audioName = 例句自带音频在媒体清单里的文件名
 export type RelatedType = 'kanji' | 'stem' | 'lesson'
 export interface RelatedWord { wordId: number; type: RelatedType; score: number }
 export interface FieldSnap { name: string; value: string }

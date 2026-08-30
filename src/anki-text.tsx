@@ -38,6 +38,7 @@ export function AnkiText({ text, resolve, term, ruby }: {
   const nodes: ReactNode[] = []
   let last = 0
   let key = 0
+  let bold = false // <b>…</b> 之间的高亮段（蓝宝书等牌组用它标注语法点位置）
   const marked = (chunk: string): ReactNode => {
     if (term && chunk.includes(term)) {
       const idx = chunk.indexOf(term)
@@ -51,19 +52,23 @@ export function AnkiText({ text, resolve, term, ruby }: {
   }
   const pushText = (chunk: string) => {
     if (!chunk) return
+    let node: ReactNode
     if (ruby && BRACKET_PART_RE.test(chunk)) {
+      const parts: ReactNode[] = []
       let pos = 0
       for (const m of chunk.matchAll(BRACKET_PART_G)) {
-        if (m.index > pos) nodes.push(marked(chunk.slice(pos, m.index)))
-        nodes.push(
-          <ruby key={key++}>{m[1]}<rt className="text-[0.55em] font-normal text-zinc-400">{m[2]}</rt></ruby>,
+        if (m.index > pos) parts.push(marked(chunk.slice(pos, m.index)))
+        parts.push(
+          <ruby key={`r${key++}`}>{m[1]}<rt className="text-[0.55em] font-normal text-zinc-400">{m[2]}</rt></ruby>,
         )
         pos = m.index + m[0].length
       }
-      nodes.push(marked(chunk.slice(pos)))
+      parts.push(marked(chunk.slice(pos)))
+      node = <>{parts}</>
     } else {
-      nodes.push(marked(chunk))
+      node = marked(chunk)
     }
+    nodes.push(bold ? <mark key={key++} className={HL}>{node}</mark> : node)
   }
 
   for (const m of text.matchAll(TOKEN_RE)) {
@@ -77,6 +82,8 @@ export function AnkiText({ text, resolve, term, ruby }: {
       if (blob) nodes.push(<img key={key++} src={blobUrl(blob)} className="mx-auto my-1 max-h-48 rounded-lg" />)
     } else if (/^<br/i.test(tag)) {
       nodes.push(<br key={key++} />)
+    } else if (/^<\/?b(?:\s[^>]*)?>$/i.test(tag)) {
+      bold = !tag.startsWith('</') // <b> 开启高亮、</b> 结束
     } else if (/^\[sound:/i.test(tag)) {
       const name = tag.slice(7, -1)
       const blob = blobByName(name)
@@ -88,7 +95,7 @@ export function AnkiText({ text, resolve, term, ruby }: {
         )
       }
     }
-    // 其余标签（<b> 等）剥离
+    // 其余标签（<i> 等）剥离
   }
   pushText(text.slice(last))
   return <>{nodes}</>

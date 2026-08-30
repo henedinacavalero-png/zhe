@@ -22,6 +22,13 @@ describe('runImport 管线', () => {
     expect(audioNames).toEqual(['pop.mp3']) // 裁定 1：audioNames[i] 对应 words[i] 的源 note
   })
 
+  test('buildWords：例句字段里的 [sound:] 提取为该例句的音频名（例句音频与单词音频分离）', () => {
+    const n: RawNote = { mid: 1, fields: ['食べる', 'たべる', '吃', '朝ごはんを食べる。[sound:ex1.mp3]'], tags: [] }
+    const { words } = buildWords([n], { term: 0, reading: 1, meaning: 2, example: 3, exampleZh: null, exampleRt: null }, 7)
+    expect(words[0].examples[0].audioName).toBe('ex1.mp3')
+    expect(words[0].examples[0].ja).not.toContain('[sound:')
+  })
+
   test('buildWords：无例句列 → examples 为空数组', () => {
     const { words } = buildWords([note], { term: 0, reading: 1, meaning: 2, example: null, exampleZh: null, exampleRt: null }, 7)
     expect(words[0].examples).toEqual([])

@@ -50,7 +50,8 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
     const f = n.fields
     const term = cleanField(f[guess.term] ?? '')
     if (term === '') continue
-    const example = guess.example !== null ? cleanField(f[guess.example] ?? '') : ''
+    const exampleRaw = guess.example !== null ? (f[guess.example] ?? '') : ''
+    const example = cleanField(exampleRaw)
     const exampleZh = guess.exampleZh !== null ? cleanField(f[guess.exampleZh] ?? '') : ''
     const exampleRt = guess.exampleRt !== null ? cleanField(f[guess.exampleRt] ?? '') : ''
     const lv = parseLevel(n.tags[0])
@@ -60,7 +61,7 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
       reading: guess.reading !== null ? cleanField(f[guess.reading] ?? '') : '',
       meaning: cleanField(f[guess.meaning] ?? ''),
       pos: n.tags.find((t) => /動|名|形|副|助|接/i.test(t)) ?? '',
-      examples: example ? [{ ja: example, zh: exampleZh, rt: exampleRt || undefined }] : [],
+      examples: example ? [{ ja: example, zh: exampleZh, rt: exampleRt || undefined, audioName: exampleRaw.match(SOUND_RE)?.[1] || undefined }] : [],
       audio: null,
       tags: n.tags,
       lesson: n.tags[0] ?? null, // 首个 tag 作为课/分组线索
