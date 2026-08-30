@@ -29,9 +29,9 @@ export class TangoDB extends Dexie {
 }
 export const db = new TangoDB()
 
-export interface StudyFilter { level: string; freq: string } // level: 'all'|'N5'…; freq: 'all'|'高频'…
+export interface StudyFilter { level: string; freq: string; deckId?: number | 'all' } // level: 'all'|'N5'…; freq: 'all'|'高频'…; deckId: 'all'|牌组 id
 
-export const DEFAULT_FILTER: StudyFilter = { level: 'all', freq: 'all' }
+export const DEFAULT_FILTER: StudyFilter = { level: 'all', freq: 'all', deckId: 'all' }
 
 export async function getStreak(): Promise<Streak> {
   return (await db.settings.get('streak') as Streak | undefined) ?? { key: 'streak', days: 0, lastStudyDate: '' }
@@ -52,6 +52,15 @@ export async function getAppSettings(): Promise<AppSettings> {
 
 /** 按筛选条件取候选词主键（index 查询，不整行加载） */
 export async function candidateKeys(f: StudyFilter, database: TangoDB = db): Promise<number[]> {
+  if (f.deckId !== undefined && f.deckId !== 'all') {
+    const deckKeys = await database.words.where('deckId').equals(f.deckId).primaryKeys()
+    if (f.level === 'all') return deckKeys
+    const deckSet = new Set(deckKeys)
+    const byLevel = f.freq !== 'all'
+      ? await database.words.where('[level+freq]').equals([f.level, f.freq]).primaryKeys()
+      : await database.words.where('level').equals(f.level).primaryKeys()
+    return byLevel.filter((id) => deckSet.has(id))
+  }
   if (f.level === 'all') return database.words.toCollection().primaryKeys()
   if (f.freq !== 'all') return database.words.where('[level+freq]').equals([f.level, f.freq]).primaryKeys()
   return database.words.where('level').equals(f.level).primaryKeys()

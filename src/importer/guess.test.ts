@@ -65,3 +65,16 @@ test('真实 JLPT 牌组形态：无句号例句列、少量外语转写读音�
     term: 1, reading: 4, meaning: 5, example: 7, exampleRt: 8, exampleZh: 9,
   })
 })
+
+test('文法卡组形态：常量书名列与 GUID 列不得当选，Word/Explain/Example 正确识别', () => {
+  // 复刻蓝宝书文法卡组：Level 列全是"蓝宝书【N1】"常量，Note ID 全是 GUID，字段超多（只列关键列）
+  const fieldNames = ['Note ID', 'Link', 'Level', 'Word', 'Explain1', 'Example1', 'Chinese1', 'SubOrder']
+  const sample = [
+    ['d2fa5318-9630-11ef-bb6c-4c5f70aa778c', 'bluebook_link-6', '蓝宝书【N1】', '～あっての', '表示条件，"正因为有了A，才有B的存在"。', '山田監督は私の恩人です。今の私があるのも監督あってのことです', '山田教练是我的恩人。', '6'],
+    ['d2fac831-9630-11ef-b59e-4c5f70aa778c', 'bluebook_link-7', '蓝宝书【N1】', '～以外の何ものでもない', '表示强调，"不是别的，正是……"。', '彼女を悩ませているのは仕事のストレス以外のなにものでもない。', '使她烦恼的正是工作压力。', '7'],
+    ['d2faf08a-9630-11ef-bf6c-4c5f70aa778c', 'bluebook_link-1002', '蓝宝书【N2】', '～いかんで', '表示根据，"取决于……"。', '出席状況のいかんでは、停止することもある。', '根据出席情况，有可能停止。', '1002'],
+  ]
+  expect(guessMapping(fieldNames, sample)).toEqual({
+    term: 3, reading: null, meaning: 4, example: 5, exampleZh: 6, exampleRt: null,
+  })
+})

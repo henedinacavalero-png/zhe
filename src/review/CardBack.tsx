@@ -8,8 +8,17 @@ const GROUPS: { type: RelatedType; label: string; cls: string }[] = [
   { type: 'lesson', label: '同课', cls: 'bg-[#eaf1ff] text-[#3b6ef5] dark:bg-indigo-900/30 dark:text-indigo-300' },
 ]
 
-/** 汉字上方标注假名（ruby）；无读音/纯假名单词原样显示 */
+/** 汉字上方标注假名（ruby）；单词自带"漢字[かな]"注音时直接解析；无读音原样显示 */
 function Furigana({ term, reading }: { term: string; reading: string }) {
+  if (!reading && isBracketFurigana(term)) {
+    return (<>
+      {parseBracketFurigana(term).map((p, i) =>
+        p.rt
+          ? <ruby key={i}>{p.text}<rt className="text-[0.4em] font-normal text-zinc-400">{p.rt}</rt></ruby>
+          : <span key={i}>{p.text}</span>,
+      )}
+    </>)
+  }
   return (
     <>
       {alignFurigana(term, reading).map((p, i) =>
@@ -25,9 +34,11 @@ function Furigana({ term, reading }: { term: string; reading: string }) {
  *  都没有则仅高亮目标词。高亮用下划线式底色（比色块雅） */
 function Highlight({ sentence, term, reading }: { sentence: string; term: string; reading?: string }) {
   const HL = 'rounded-sm bg-[linear-gradient(transparent_55%,#c9dcff_55%)] font-bold dark:bg-[linear-gradient(transparent_55%,#3730a3aa_55%)]'
-  if (reading && isBracketFurigana(reading)) {
+  // 例句自身带"漢字[かな]"内嵌注音（如文法卡组）时直接解析例句
+  const bracketSource = reading && isBracketFurigana(reading) ? reading : isBracketFurigana(sentence) ? sentence : null
+  if (bracketSource) {
     return (<>
-      {parseBracketFurigana(reading).map((p, i) => {
+      {parseBracketFurigana(bracketSource).map((p, i) => {
         const inner = p.rt
           ? <ruby>{p.text}<rt className="text-[0.55em] font-normal text-zinc-400">{p.rt}</rt></ruby>
           : p.text

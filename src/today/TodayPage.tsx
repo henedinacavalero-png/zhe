@@ -35,6 +35,7 @@ export default function TodayPage() {
   const { settings, setStudyFilter } = useSettings()
   const filter: StudyFilter = settings?.studyFilter ?? DEFAULT_FILTER
   const progress = useLiveQuery(() => db.progress.toArray(), [])
+  const decks = useLiveQuery(() => db.decks.toArray(), [])
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [info, setInfo] = useState({ news: 0, due: 0, streakDays: 0, ready: false })
 
@@ -47,6 +48,16 @@ export default function TodayPage() {
       setCounts(c)
     })()
   }, [])
+
+  // 牌组行出现/变化 → 各牌组词数
+  useEffect(() => {
+    (async () => {
+      if (!decks) return
+      const c: Record<string, number> = {}
+      for (const d of decks) c[`deck:${d.id}`] = await db.words.where('deckId').equals(d.id!).count()
+      setCounts((prev) => ({ ...prev, ...c }))
+    })()
+  }, [decks])
 
   // 筛选条件变化 → 各频率档计数
   useEffect(() => {
@@ -76,6 +87,12 @@ export default function TodayPage() {
   }, [filter, progress])
 
   const levelLabel = filter.level === 'all' ? '全部范围' : filter.level + (filter.freq !== 'all' ? ` · ${filter.freq}` : '')
+  const deckLabel = (() => {
+    if (filter.deckId === undefined || filter.deckId === 'all') return ''
+    const d = decks?.find((x) => x.id === filter.deckId)
+    return d ? `《${d.name}》` : ''
+  })()
+  const scopeLabel = [deckLabel, levelLabel].filter(Boolean).join(' · ')
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 p-4">
@@ -90,7 +107,7 @@ export default function TodayPage() {
         </div>
 
         <div className="animate-pop rounded-3xl bg-white p-5 shadow-[0_6px_18px_rgba(59,110,245,0.10)] dark:bg-zinc-800">
-          <div className="text-xs text-zinc-400">{levelLabel} · 今天的任务</div>
+          <div className="text-xs text-zinc-400">{scopeLabel} · 今天的任务</div>
           <div className="text-5xl font-black leading-tight text-[#3b6ef5]">{info.ready ? info.news : '…'}</div>
           <div className="-mt-1 text-xs text-zinc-500">个新词待认</div>
           <div className="mt-3 flex justify-around rounded-xl bg-[#f1f5fd] px-2 py-2 text-xs text-slate-600 dark:bg-zinc-700/60 dark:text-zinc-300">
@@ -101,13 +118,28 @@ export default function TodayPage() {
       </div>
 
       <div className="w-full max-w-sm space-y-2">
-        <div className="flex flex-wrap justify-center gap-2">
-          {LEVELS.map((lv) => (
-            <Chip key={lv.key} label={lv.label} count={counts[lv.key]}
-              active={filter.level === lv.key}
-              onClick={() => setStudyFilter({ level: lv.key, freq: 'all' })} />
-          ))}
-        </div>
+        {decks && decks.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2">
+            <Chip label="全部词库" count={counts.all}
+              active={filter.deckId === undefined || filter.deckId === 'all'}
+              onClick={() => setStudyFilter({ ...filter, deckId: 'all' })} />
+            {decks.map((d) => (
+              <Chip key={d.id} label={d.name.length > 10 ? d.name.slice(0, 10) + '…' : d.name}
+                count={counts[`deck:${d.id}`]}
+                active={filter.deckId === d.id}
+                onClick={() => setStudyFilter({ ...filter, deckId: d.id! })} />
+            ))}
+          </div>
+        )}
+        {(filter.level === 'all' ? Object.values(counts).slice(1).some((v) => v > 0) : true) && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {LEVELS.map((lv) => (
+              <Chip key={lv.key} label={lv.label} count={counts[lv.key]}
+                active={filter.level === lv.key}
+                onClick={() => setStudyFilter({ ...filter, level: lv.key, freq: 'all' })} />
+            ))}
+          </div>
+        )}
         {HAS_FREQ[filter.level] && (
           <div className="flex flex-wrap justify-center gap-2">
             {FREQS.map((f) => (
