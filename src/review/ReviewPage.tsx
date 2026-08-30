@@ -17,6 +17,7 @@ export default function ReviewPage() {
   const nav = useNavigate()
   const [session, setSession] = useState<{ ids: number[]; idx: number; revealed: boolean } | null>(null)
   const [wordsById, setWordsById] = useState<Map<number, Word>>(new Map())
+  const [scopeEmpty, setScopeEmpty] = useState(false)
 
   async function loadWords(ids: number[]) {
     // 全词库轻量副本（剥音频防内存膨胀）供相关词胶囊查词；当日队列词再覆盖为完整版（含音频/例句）
@@ -31,6 +32,7 @@ export default function ReviewPage() {
       const settings = await getAppSettings()
       // 队列只需要主键：按背词范围索引直取（避免整行加载），新词随机顺序
       const [keys, prog] = await Promise.all([candidateKeys(settings.studyFilter ?? DEFAULT_FILTER), db.progress.toArray()])
+      setScopeEmpty(keys.length === 0)
       const stubs = keys.map((id) => ({ id })) as unknown as Word[]
       const map = new Map(prog.map((p) => [p.wordId, p]))
       const ids = pickDailyQueue(stubs, map, settings.dailyNewLimit, { shuffle: true })
@@ -55,7 +57,13 @@ export default function ReviewPage() {
   }
 
   if (!session) return <div className="p-4">加载中…</div>
-  if (session.ids.length === 0) return <div className="p-8 text-center text-zinc-500">今天没有要背的单词 🎉</div>
+  if (session.ids.length === 0) {
+    return (
+      <div className="p-8 text-center text-zinc-500">
+        {scopeEmpty ? '这个范围没有单词，回首页换个筛选条件吧' : '今天没有要背的单词 🎉'}
+      </div>
+    )
+  }
 
   const word = wordsById.get(session.ids[session.idx])
   if (!word) return null

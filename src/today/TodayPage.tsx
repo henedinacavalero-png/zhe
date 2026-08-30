@@ -5,16 +5,15 @@ import { pickDailyQueue } from '../scheduler/scheduler'
 import { useEffect, useState } from 'react'
 import type { Word } from '../db/types'
 import { useSettings } from '../settings/useSettings'
-import type { Freq } from '../library/level'
 
 const LEVELS: { key: string; label: string }[] = [
   { key: 'all', label: '全部' }, { key: 'N5', label: 'N5' }, { key: 'N4', label: 'N4' },
   { key: 'N3', label: 'N3' }, { key: 'N2', label: 'N2' }, { key: 'N1', label: 'N1' },
+  { key: '', label: '未分级' }, // 无 JLPT 课标签的牌组（如 Tae Kim 动漫句卡）也纳入按条件背诵
 ]
 const FREQS: { key: string; label: string }[] = [
   { key: 'all', label: '全部频率' }, { key: '高频', label: '高频' }, { key: '中频', label: '中频' }, { key: '低频', label: '低频' },
 ]
-const HAS_FREQ: Record<string, boolean> = { N1: true, N2: true, N3: true }
 
 function Chip({ active, label, count, onClick }: { active: boolean; label: string; count?: number; onClick: () => void }) {
   return (
@@ -37,39 +36,30 @@ export default function TodayPage() {
   const progress = useLiveQuery(() => db.progress.toArray(), [])
   const decks = useLiveQuery(() => db.decks.toArray(), [])
   const [counts, setCounts] = useState<Record<string, number>>({})
-  const [info, setInfo] = useState({ news: 0, due: 0, streakDays: 0, ready: false })
+  const [info, setInfo] = useState({ news: 0, due: 0, scopeTotal: 0, streakDays: 0, ready: false })
 
-  // 各档词数（索引计数，快）
-  useEffect(() => {
-    (async () => {
-      const all = await db.words.count()
-      const c: Record<string, number> = { all }
-      for (const lv of ['N5', 'N4', 'N3', 'N2', 'N1']) c[lv] = await db.words.where('level').equals(lv).count()
-      setCounts(c)
-    })()
-  }, [])
-
-  // 牌组行出现/变化 → 各牌组词数
+  // 筛选变化 → 重算各 chip 计数。口径与背诵队列一致（candidateKeys）：
+  // 每个 chip 的数字 = 点选它之后会得到的词数，且只统计当前范围（选了牌组就只算该牌组）
   useEffect(() => {
     (async () => {
       if (!decks) return
-      const c: Record<string, number> = {}
-      for (const d of decks) c[`deck:${d.id}`] = await db.words.where('deckId').equals(d.id!).count()
-      setCounts((prev) => ({ ...prev, ...c }))
-    })()
-  }, [decks])
-
-  // 筛选条件变化 → 各频率档计数
-  useEffect(() => {
-    (async () => {
-      if (filter.level === 'all') return
-      const c: Record<string, number> = { all: await db.words.where('level').equals(filter.level).count() }
-      for (const f of ['高频', '中频', '低频'] as Freq[]) {
-        c[f] = await db.words.where('[level+freq]').equals([filter.level, f]).count()
+      const c: Record<string, number> = {
+        'deck:all': (await candidateKeys({ ...filter, deckId: 'all' })).length,
+        'level:all': (await candidateKeys({ ...filter, level: 'all' })).length,
       }
-      setCounts((prev) => ({ ...prev, [filter.level]: c.all, ...c }))
+      for (const d of decks) c[`deck:${d.id}`] = (await candidateKeys({ ...filter, deckId: d.id! })).length
+      for (const lv of ['N5', 'N4', 'N3', 'N2', 'N1', '']) {
+        c[lv === '' ? 'none' : lv] = (await candidateKeys({ ...filter, level: lv, freq: 'all' })).length
+      }
+      if (filter.level !== 'all' && filter.level !== '') {
+        for (const f of FREQS) {
+          if (f.key === 'all') continue
+          c[`freq:${f.key}`] = (await candidateKeys({ ...filter, freq: f.key })).length
+        }
+      }
+      setCounts(c)
     })()
-  }, [filter.level])
+  }, [filter, decks])
 
   // 今日队列（按筛选范围，新词随机）
   useEffect(() => {
@@ -82,7 +72,7 @@ export default function TodayPage() {
       const progressMap = new Map(progress.map((p) => [p.wordId, p]))
       const q = pickDailyQueue(stubs, progressMap, appSettings.dailyNewLimit, { shuffle: true })
       const news = q.filter((id) => progressMap.get(id)?.isNew).length
-      setInfo({ news, due: q.length - news, streakDays: s.days, ready: true })
+      setInfo({ news, due: q.length - news, scopeTotal: keys.length, streakDays: s.days, ready: true })
     })()
   }, [filter, progress])
 
@@ -93,6 +83,10 @@ export default function TodayPage() {
     return d ? `《${d.name}》` : ''
   })()
   const scopeLabel = [deckLabel, levelLabel].filter(Boolean).join(' · ')
+  // 空范围（如「无级别牌组 + N5」）≠ 今天背完了；0 词的 chip 隐藏，除非它正是当前选中项
+  const scopeEmpty = info.ready && info.scopeTotal === 0
+  const hasLevelData = ['N5', 'N4', 'N3', 'N2', 'N1', 'none'].some((k) => (counts[k] ?? 0) > 0)
+  const showFreqRow = filter.level !== 'all' && filter.level !== '' && FREQS.some((f) => f.key !== 'all' && (counts[`freq:${f.key}`] ?? 0) > 0)
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 p-4">
@@ -120,40 +114,56 @@ export default function TodayPage() {
       <div className="w-full max-w-sm space-y-2">
         {decks && decks.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2">
-            <Chip label="全部词库" count={counts.all}
-              active={filter.deckId === undefined || filter.deckId === 'all'}
-              onClick={() => setStudyFilter({ ...filter, deckId: 'all' })} />
-            {decks.map((d) => (
-              <Chip key={d.id} label={d.name.length > 10 ? d.name.slice(0, 10) + '…' : d.name}
-                count={counts[`deck:${d.id}`]}
-                active={filter.deckId === d.id}
-                onClick={() => setStudyFilter({ ...filter, deckId: d.id! })} />
-            ))}
+            {decks.map((d) => {
+              const count = counts[`deck:${d.id}`]
+              const active = filter.deckId === d.id
+              if (count === 0 && !active) return null
+              return (
+                <Chip key={d.id} label={d.name.length > 10 ? d.name.slice(0, 10) + '…' : d.name}
+                  count={count} active={active}
+                  onClick={() => setStudyFilter({ ...filter, deckId: d.id! })} />
+              )
+            })}
+            {(() => {
+              const allCount = counts['deck:all']
+              const allActive = filter.deckId === undefined || filter.deckId === 'all'
+              if (allCount === 0 && !allActive) return null
+              return <Chip label="全部词库" count={allCount} active={allActive}
+                onClick={() => setStudyFilter({ ...filter, deckId: 'all' })} />
+            })()}
           </div>
         )}
-        {(filter.level === 'all' ? Object.values(counts).slice(1).some((v) => v > 0) : true) && (
+        {(hasLevelData || filter.level !== 'all') && (
           <div className="flex flex-wrap justify-center gap-2">
-            {LEVELS.map((lv) => (
-              <Chip key={lv.key} label={lv.label} count={counts[lv.key]}
-                active={filter.level === lv.key}
-                onClick={() => setStudyFilter({ ...filter, level: lv.key, freq: 'all' })} />
-            ))}
+            {LEVELS.map((lv) => {
+              const count = lv.key === 'all' ? counts['level:all'] : lv.key === '' ? counts.none : counts[lv.key]
+              const active = filter.level === lv.key
+              if (count === 0 && !active) return null
+              return (
+                <Chip key={lv.key} label={lv.label} count={count} active={active}
+                  onClick={() => setStudyFilter({ ...filter, level: lv.key, freq: 'all' })} />
+              )
+            })}
           </div>
         )}
-        {HAS_FREQ[filter.level] && (
+        {showFreqRow && (
           <div className="flex flex-wrap justify-center gap-2">
-            {FREQS.map((f) => (
-              <Chip key={f.key} label={f.label} count={counts[f.key]}
-                active={filter.freq === f.key}
-                onClick={() => setStudyFilter({ ...filter, freq: f.key })} />
-            ))}
+            {FREQS.map((f) => {
+              const count = f.key === 'all' ? counts[filter.level] : counts[`freq:${f.key}`]
+              const active = filter.freq === f.key
+              if (count === 0 && !active) return null
+              return (
+                <Chip key={f.key} label={f.label} count={count} active={active}
+                  onClick={() => setStudyFilter({ ...filter, freq: f.key })} />
+              )
+            })}
           </div>
         )}
       </div>
 
       <Link to="/review"
         className="w-full max-w-sm rounded-full bg-gradient-to-r from-[#3b6ef5] to-[#6366f1] py-3 text-center font-bold text-white shadow-[0_8px_20px_rgba(59,110,245,0.35)]">
-        {info.news + info.due > 0 ? '开始背诵 →' : '这个范围今天背完了 🎉'}
+        {!info.ready ? '…' : scopeEmpty ? '这个范围没有单词' : info.news + info.due > 0 ? '开始背诵 →' : '这个范围今天背完了 🎉'}
       </Link>
     </div>
   )

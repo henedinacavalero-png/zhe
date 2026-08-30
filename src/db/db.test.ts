@@ -61,3 +61,22 @@ test('v1→v2 迁移：存量词从 lesson 标签回填 level/freq 索引', asyn
   up.close()
   await Dexie.delete('tangochou-mig-test')
 })
+
+test('candidateKeys：未分级（level=""）可筛选；牌组+级别取交集不串牌组', async () => {
+  const noLevel = await db.decks.add({ name: 'TaeKim（无级别标签）', importedAt: 1, wordCount: 0 })
+  const graded = await db.decks.add({ name: 'eggrolls（有级别）', importedAt: 2, wordCount: 0 })
+  await db.words.bulkAdd([
+    { deckId: noLevel, term: 'sentence', reading: '', meaning: '', pos: '', examples: [], audio: null,
+      tags: ['JLAB-B'], lesson: null, level: '', freq: '', related: [] },
+    { deckId: graded, term: '山', reading: 'やま', meaning: '', pos: '', examples: [], audio: null,
+      tags: ['egg::1-N5'], lesson: 'egg::1-N5', level: 'N5', freq: '', related: [] },
+  ] as Word[])
+
+  const none = await candidateKeys({ level: '', freq: 'all' })
+  expect(none).toHaveLength(1)
+  // bug 复现口径：无级别牌组 ∩ N5 = 空（N5 词全在另一个牌组）
+  const empty = await candidateKeys({ level: 'N5', freq: 'all', deckId: noLevel })
+  expect(empty).toHaveLength(0)
+  const hit = await candidateKeys({ level: 'N5', freq: 'all', deckId: graded })
+  expect(hit).toHaveLength(1)
+})
