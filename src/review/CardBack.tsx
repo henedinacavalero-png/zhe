@@ -2,6 +2,7 @@ import type { FieldSnap, RelatedType, Word } from '../db/types'
 import { playBlob } from '../audio'
 import { alignFurigana, alignSentenceReading, isBracketFurigana, parseBracketFurigana } from './furigana'
 import { AnkiText, WordImages } from '../anki-text'
+import { visibleFields } from './fieldFilter'
 
 const GROUPS: { type: RelatedType; label: string; cls: string }[] = [
   { type: 'kanji', label: '同汉字', cls: 'bg-[#e8f6ee] text-[#1e8e4e] dark:bg-emerald-900/30 dark:text-emerald-300' },
@@ -70,6 +71,8 @@ const FIELD_LABEL: Record<string, string> = {
   Word: '语法点 / 单词', Example: '例句', Chinese: '译文', Explain: '解説', Note: '注意',
   Connective: '接续', GakkoConnective: '接续', Level: '级别', SentenceTag: '例句标签',
   Honorific: '敬语', Pitch: '声调', PoS: '词性', Furigana: '读音', Audio: '音频', Kanji: '汉字',
+  Source: '出处', Image: '图片', References: '参考', RemarksFront: '注解', Remarks: '注解',
+  Translation: '翻译', Meaning: '释义', Back: '背面',
 }
 
 interface Section { label: string; items: string[] }
@@ -78,7 +81,8 @@ function groupFields(fields: FieldSnap[]): Section[] {
   const sections: Section[] = []
   for (const f of fields) {
     const base = f.name.replace(/\d+$/, '')
-    const label = FIELD_LABEL[base] ?? base
+    // 牌组自带前缀（如 Jlab-Translation）剥掉后再查一次表
+    const label = FIELD_LABEL[base] ?? FIELD_LABEL[base.slice(base.lastIndexOf('-') + 1)] ?? base
     const last = sections[sections.length - 1]
     if (last && last.label === label) last.items.push(f.value)
     else sections.push({ label, items: [f.value] })
@@ -96,7 +100,7 @@ export default function CardBack({ word, wordsById, onJump }: {
     images: word.images ?? null,
     audio: word.audio && word.audioName ? { name: word.audioName, blob: word.audio } : null,
   }
-  const sections = groupFields(word.fields ?? [])
+  const sections = groupFields(visibleFields(word))
   const related = GROUPS
     .map((g) => ({ ...g, items: word.related.filter((r) => r.type === g.type && wordsById.has(r.wordId)) }))
     .filter((g) => g.items.length)
@@ -112,7 +116,7 @@ export default function CardBack({ word, wordsById, onJump }: {
           )}
         </div>
         {word.pos && <div className="mt-1"><span className="rounded-md bg-[#eef2ff] px-1.5 py-0.5 text-xs text-[#5b74e8] dark:bg-indigo-900/40 dark:text-indigo-300">{word.pos}</span></div>}
-        <div className="mt-1 text-lg"><strong className="text-slate-800 dark:text-zinc-100">{word.meaning}</strong></div>
+        <div className="mt-1 text-lg"><strong className="text-slate-800 dark:text-zinc-100"><AnkiText text={word.meaning} resolve={resolve} /></strong></div>
         <WordImages images={word.images} />
       </div>
 
