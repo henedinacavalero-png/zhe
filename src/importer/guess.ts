@@ -61,7 +61,7 @@ function avgLen(vals: string[]): number {
 /** 字段名语义提示：按顺序认领槽位（名字就是说明书，比内容特征可靠得多） */
 const NAME_HINTS: { slot: keyof FieldGuess; re: RegExp }[] = [
   { slot: 'term', re: /^(word|term|front|expression|vocab|単語|单词)/i },
-  { slot: 'reading', re: /(reading|furigana|kana|よみ|读音)/i },
+  { slot: 'reading', re: /(reading|furigana|hiragana|kana|よみ|读音)/i },
   { slot: 'example', re: /(example|sentkanji|sentence|例文|例句)/i },
   { slot: 'meaning', re: /(explain|meaning|back|释义|def|意味)/i },
   { slot: 'exampleZh', re: /(chinese|翻译|译|中文)/i },
