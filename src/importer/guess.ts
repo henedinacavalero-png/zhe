@@ -20,7 +20,7 @@ function looksLikeReading(vals: string[], sampleCount: number): boolean {
   return kana / vals.length >= 0.85 && short / vals.length >= 0.9
 }
 
-/** 例句列：≥8 成采样行非空，过半非空值是"假名+汉字混合、长度≥6"的日文句（无句号也算，如"妹は高校に通っています"） */
+/** 例句列：≥8 成采样行非空，过半非空值是"假名+汉字混合、长度≥6"的日文句（无句号也算） */
 function looksLikeSentence(vals: string[], sampleCount: number): boolean {
   if (vals.length < sampleCount * 0.8) return false
   const sentence = vals.filter((v) => {
@@ -45,49 +45,6 @@ function isMetaColumn(vals: string[]): boolean {
   return vals.every((v) => v === vals[0])
 }
 
-export function guessMapping(fieldNames: string[], samples: string[][]): FieldGuess {
-  const n = fieldNames.length
-  let term = 0, reading: number | null = null, meaning = n > 1 ? 1 : 0
-  let example: number | null = null, exampleZh: number | null = null, exampleRt: number | null = null
-
-  for (let c = 0; c < n; c++) {
-    if (reading === null && looksLikeReading(column(samples, c), samples.length)) reading = c
-  }
-  for (let c = 0; c < n; c++) {
-    if (c === reading) continue
-    if (example === null && looksLikeSentence(column(samples, c), samples.length)) example = c
-  }
-  // 单词：含汉字、非整列假名、非常量/GUID 的候选列里取**唯一值率**最高的（词汇列每行不同，
-  // 书名/级别这类元数据列大量重复）；并列取靠前的（默认 0 已满足多数 Anki 模板）
-  const used = new Set([reading, example].filter((x): x is number => x !== null))
-  const candidates = [...Array(n).keys()].filter((c) => !used.has(c))
-  const uniqueRatio = (c: number) => {
-    const vals = column(samples, c)
-    return new Set(vals).size / Math.max(samples.length, 1)
-  }
-  term = candidates.filter((c) => {
-    if (isMetaColumn(column(samples, c))) return false
-    return column(samples, c).some((v) => HAS_KANJI_RE.test(v) && !KANA_RE.test(v))
-  })
-    .sort((a, b) => uniqueRatio(b) - uniqueRatio(a))[0]
-    ?? candidates.find((c) => !isMetaColumn(column(samples, c))) ?? candidates[0] ?? 0
-  // 释义/例句翻译/例句注音（规格 §5"含中文的列"）：中文列按位置分两组——例句列**之前**的是释义
-  // （取平均文本最长的，释义列比词性列长；跳过单词列），例句列**之后**的第一个中文列是例句翻译、
-  // 第一个长假名列是例句注音（SentKanji → SentFurigana → SentDefSC 的典型排布）
-  const afterExample = example === null ? [] : candidates.filter((c) => c > example!)
-  const hanNoKana = candidates.filter((c) => c !== term && looksLikeChinese(column(samples, c)))
-  const before = example === null ? hanNoKana : hanNoKana.filter((c) => c < example!)
-  meaning = [...before].sort((a, b) => avgLen(column(samples, b)) - avgLen(column(samples, a)))[0]
-    ?? candidates.find((c) => c !== term && !isMetaColumn(column(samples, c))) ?? term
-  if (example !== null) {
-    exampleZh = hanNoKana.find((c) => c > example!) ?? null
-    const zhUsed = new Set([exampleZh].filter((x): x is number => x !== null))
-    exampleRt = afterExample.find((c) =>
-      !zhUsed.has(c) && looksLikeSentenceRt(column(samples, c), samples.length)) ?? null
-  }
-  return { term, reading, meaning, example, exampleZh, exampleRt }
-}
-
 /** 例句注音列："漢字[かな]"内嵌注音格式（<b> 标目标词），或 ≥9 成纯假名的整句假名列 */
 function looksLikeSentenceRt(vals: string[], sampleCount: number): boolean {
   if (vals.length < sampleCount * 0.8) return false
@@ -99,4 +56,67 @@ function looksLikeSentenceRt(vals: string[], sampleCount: number): boolean {
 
 function avgLen(vals: string[]): number {
   return vals.reduce((s, v) => s + v.trim().length, 0) / (vals.length || 1)
+}
+
+/** 字段名语义提示：按顺序认领槽位（名字就是说明书，比内容特征可靠得多） */
+const NAME_HINTS: { slot: keyof FieldGuess; re: RegExp }[] = [
+  { slot: 'term', re: /^(word|term|front|expression|vocab|単語|单词)/i },
+  { slot: 'reading', re: /(reading|furigana|kana|よみ|读音)/i },
+  { slot: 'example', re: /(example|sentkanji|sentence|例文|例句)/i },
+  { slot: 'meaning', re: /(explain|meaning|back|释义|def|意味)/i },
+  { slot: 'exampleZh', re: /(chinese|翻译|译|中文)/i },
+]
+
+export function guessMapping(fieldNames: string[], samples: string[][]): FieldGuess {
+  const n = fieldNames.length
+  const valsOf = (c: number) => column(samples, c)
+  const uniqueRatio = (c: number) => new Set(valsOf(c)).size / Math.max(samples.length, 1)
+  const out: FieldGuess = { term: -1, reading: null, meaning: -1, example: null, exampleZh: null, exampleRt: null }
+  const claimed = new Set<number>()
+
+  // —— 第一遍：字段名语义匹配 ——
+  // 守卫：认列的列非空占比须 ≥5 成（排除 SentenceTag/VocabPlus 之类的稀疏标注列）且非元数据列
+  for (const h of NAME_HINTS) {
+    for (let c = 0; c < n; c++) {
+      if (claimed.has(c) || isMetaColumn(valsOf(c))) continue
+      const vals = valsOf(c)
+      if (vals.length < samples.length * 0.5) continue
+      if (h.re.test(fieldNames[c])) { out[h.slot] = c as never; claimed.add(c); break }
+    }
+  }
+
+  // —— 第二遍：内容特征兜底，只填名字没认出的槽位 ——
+  const avail = [...Array(n).keys()].filter((c) => !claimed.has(c))
+  if (out.reading === null) {
+    out.reading = avail.find((c) => looksLikeReading(valsOf(c), samples.length)) ?? null
+  }
+  if (out.example === null) {
+    out.example = avail.find((c) => looksLikeSentence(valsOf(c), samples.length)) ?? null
+  }
+  if (out.term === -1) {
+    // 含汉字、非常量/GUID 的候选列里取唯一值率最高的（词汇列每行不同，元数据列大量重复）；
+    // 候选全被占时放宽到"非读音、非元数据"的列（可与释义共列，如只有兩列的小牌组）
+    out.term = avail.filter((c) =>
+      !isMetaColumn(valsOf(c)) && valsOf(c).some((v) => HAS_KANJI_RE.test(v) && !KANA_RE.test(v)))
+      .sort((a, b) => uniqueRatio(b) - uniqueRatio(a))[0]
+      ?? [...Array(n).keys()].filter((c) => c !== out.reading && !isMetaColumn(valsOf(c)))
+          .sort((a, b) => uniqueRatio(b) - uniqueRatio(a))[0]
+      ?? 0
+  }
+  // 释义：例句前的中文列取平均最长（释义列比词性列长）；兜底取第一个非常量候选
+  const hanNoKana = avail.filter((c) => c !== out.term && looksLikeChinese(valsOf(c)))
+  if (out.meaning === -1 || out.meaning === out.term) {
+    const before = out.example === null ? hanNoKana : hanNoKana.filter((c) => c < out.example!)
+    out.meaning = [...before].sort((a, b) => avgLen(valsOf(b)) - avgLen(valsOf(a)))[0]
+      ?? avail.find((c) => c !== out.term && !isMetaColumn(valsOf(c))) ?? out.term
+  }
+  // 例句翻译：例句之后的第一个中文列；例句注音：其后的"漢字[かな]"列或长假名列
+  if (out.example !== null) {
+    if (out.exampleZh === null) out.exampleZh = hanNoKana.find((c) => c > out.example!) ?? null
+    if (out.exampleRt === null) {
+      out.exampleRt = avail.find((c) =>
+        c > out.example! && c !== out.exampleZh && looksLikeSentenceRt(valsOf(c), samples.length)) ?? null
+    }
+  }
+  return out
 }
