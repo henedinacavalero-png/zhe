@@ -18,11 +18,14 @@ export async function decodeAudio(dataUrl: string): Promise<Blob> {
   return new Blob([buf], { type })
 }
 
+type WordWithoutMedia = Omit<Word, 'audio' | 'images'>
+
 interface Backup {
   version: 1
   decks: Deck[]
-  words: Omit<Word, 'audio'>[]
+  words: WordWithoutMedia[]
   audioByWordId: Record<string, string | undefined>
+  imagesByWordId?: Record<string, Record<string, string> | undefined> // 文件名 → dataURL
   progress: Progress[]
   settings: (AppSettings | Streak)[]
 }
@@ -32,23 +35,33 @@ export async function exportBackup(): Promise<Blob> {
     db.decks.toArray(), db.words.toArray(), db.progress.toArray(), db.settings.toArray(),
   ])
   const audioByWordId: Record<string, string | undefined> = {}
-  const bareWords: Omit<Word, 'audio'>[] = []
+  const imagesByWordId: Record<string, Record<string, string> | undefined> = {}
+  const bareWords: WordWithoutMedia[] = []
   for (const w of words) {
-    const { audio, ...rest } = w
+    const { audio, images, ...rest } = w
     audioByWordId[String(w.id)] = audio ? await encodeAudio(audio) : undefined
+    if (images && Object.keys(images).length) {
+      const enc: Record<string, string> = {}
+      for (const [name, blob] of Object.entries(images)) enc[name] = await encodeAudio(blob)
+      imagesByWordId[String(w.id)] = enc
+    }
     bareWords.push(rest)
   }
-  const backup: Backup = { version: 1, decks, words: bareWords, audioByWordId, progress, settings }
+  const backup: Backup = { version: 1, decks, words: bareWords, audioByWordId, imagesByWordId, progress, settings }
   return new Blob([JSON.stringify(backup)], { type: 'application/json' })
 }
 
 export async function importBackup(file: Blob): Promise<void> {
   const backup = JSON.parse(await file.text()) as Backup
   if (backup.version !== 1) throw new Error('不支持的备份文件版本')
-  // 音频按原 word id 找回（Dexie 对带主键的对象保留原 id），先解码再一次性 bulkAdd
+  // 音频/图片按原 word id 找回（Dexie 对带主键的对象保留原 id），先解码再一次性 bulkAdd
   const words = await Promise.all(backup.words.map(async (w) => {
-    const dataUrl = backup.audioByWordId[String(w.id)]
-    return { ...w, audio: dataUrl ? await decodeAudio(dataUrl) : null }
+    const audioData = backup.audioByWordId[String(w.id)]
+    const imgs = backup.imagesByWordId?.[String(w.id)]
+    const images: Record<string, Blob> | null = imgs
+      ? Object.fromEntries(await Promise.all(Object.entries(imgs).map(async ([k, v]) => [k, await decodeAudio(v)])))
+      : null
+    return { ...w, audio: audioData ? await decodeAudio(audioData) : null, images }
   }))
   await db.transaction('rw', [db.decks, db.words, db.progress, db.settings], async () => {
     await Promise.all([db.decks.clear(), db.words.clear(), db.progress.clear(), db.settings.clear()])

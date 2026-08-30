@@ -7,6 +7,7 @@ export interface Word {
   examples: Example[]; audio: Blob | null; tags: string[]; lesson: string | null;
   related: RelatedWord[];
   level?: string; freq?: string; // v2 迁移/导入时从 lesson 解析（'' = 无级别）
+  images?: Record<string, Blob> | null; // 字段 <img> 引用的图片（文件名 → Blob）
 }
 export interface Progress {
   wordId: number; ease: number; interval: number; due: number;

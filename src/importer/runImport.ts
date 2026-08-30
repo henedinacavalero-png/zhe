@@ -7,6 +7,7 @@ import { db } from '../db/db'
 import type { Word } from '../db/types'
 
 const SOUND_RE = /\[sound:([^\]]+)\]/
+const IMG_SRC_RE = /<img[^>]+src="([^"]+)"/gi
 const BATCH = 200
 
 export function extractAudioName(fields: string[]): string | null {
@@ -16,12 +17,35 @@ export function extractAudioName(fields: string[]): string | null {
 
 function cleanField(s: string): string { return s.replace(SOUND_RE, '').trim() }
 
-export interface BuildWordsResult { words: Word[]; audioNames: (string | null)[] }
+/** 收集一段字段文本里 <img src> 引用的媒体名（去重，≤4 张防止单卡膨胀） */
+export function collectImageNames(texts: string[], mediaFiles: Map<string, Blob>): string[] {
+  const names: string[] = []
+  for (const t of texts) {
+    for (const m of t.matchAll(IMG_SRC_RE)) {
+      const name = m[1]
+      if (mediaFiles.has(name) && !names.includes(name)) names.push(name)
+    }
+  }
+  return names.slice(0, 4)
+}
 
-/** notes → Word 雏形。audioNames[i] 与 words[i] 一一对应（裁定 1：空 term 的 note 整体跳过，保证索引对齐） */
+/** 把图片 Blob 按文件名打包成 word.images */
+export function packImages(names: string[], mediaFiles: Map<string, Blob>): Record<string, Blob> {
+  const imgs: Record<string, Blob> = {}
+  for (const n of names) {
+    const b = mediaFiles.get(n)
+    if (b) imgs[n] = b
+  }
+  return imgs
+}
+
+export interface BuildWordsResult { words: Word[]; audioNames: (string | null)[]; noteFields: string[][] }
+
+/** notes → Word 雏形。audioNames[i]/noteFields[i] 与 words[i] 一一对应（空 term 的 note 整体跳过，保证索引对齐） */
 export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number): BuildWordsResult {
   const words: Word[] = []
   const audioNames: (string | null)[] = []
+  const noteFields: string[][] = []
   for (const n of notes) {
     const f = n.fields
     const term = cleanField(f[guess.term] ?? '')
@@ -45,8 +69,17 @@ export function buildWords(notes: RawNote[], guess: FieldGuess, deckId: number):
       related: [],
     })
     audioNames.push(extractAudioName(f))
+    noteFields.push(f)
   }
-  return { words, audioNames }
+  return { words, audioNames, noteFields }
+}
+
+/** 收集每张卡 <img> 引用的图片并挂到 word.images（Tae Kim 之类的图片卡） */
+export function attachImages(words: Word[], noteImageNames: string[][], mediaFiles: Map<string, Blob>): void {
+  for (let i = 0; i < words.length; i++) {
+    const imgs = packImages(noteImageNames[i] ?? [], mediaFiles)
+    if (Object.keys(imgs).length) words[i].images = imgs
+  }
 }
 
 /** 把媒体清单里的音频按 audioNames[i] ↔ words[i] 对齐挂载（裁定 1）；未命中保持 null */
@@ -63,8 +96,10 @@ export async function runImport(
   onProgress: (done: number, total: number) => void,
 ): Promise<number> {
   const deckId = await db.decks.add({ name: deckName, importedAt: Date.now(), wordCount: 0 })
-  const { words, audioNames } = buildWords(raw.notes, guess, deckId)
+  const { words, audioNames, noteFields } = buildWords(raw.notes, guess, deckId)
   attachAudio(words, audioNames, raw.mediaFiles)
+  // 图片卡（如 Tae Kim 动漫句卡）：把每张卡 <img> 引用的图片 Blob 挂到 word.images
+  attachImages(words, noteFields, raw.mediaFiles)
 
   const seeds: WordSeed[] = words.map((w, i) => ({ id: i, term: w.term, reading: w.reading, deckId, lesson: w.lesson }))
   const links = buildLinks(seeds) // seed.id 是词表内索引，与 Dexie 主键无关

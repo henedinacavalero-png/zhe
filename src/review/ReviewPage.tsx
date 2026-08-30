@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db, bumpStreak, getStreak, getAppSettings, candidateKeys, DEFAULT_FILTER } from '../db/db'
 import { pickDailyQueue, review, type Rating } from '../scheduler/scheduler'
 import CardBack from './CardBack'
+import { WordImages } from '../anki-text'
 import { playBlob } from '../audio'
 import type { Word } from '../db/types'
 
@@ -60,7 +61,7 @@ export default function ReviewPage() {
   if (!word) return null
 
   return (
-    <div className="flex h-full flex-col p-4">
+    <div className="flex min-h-full flex-col p-4">
       <div className="mb-2 flex items-center gap-3">
         <span className="text-xs font-bold text-zinc-400">{session.idx + 1} / {session.ids.length}</span>
         {/* 分段进度：每张卡一格 */}
@@ -76,6 +77,7 @@ export default function ReviewPage() {
         {!session.revealed ? (
           <div key={session.idx} className="animate-pop w-full rounded-3xl bg-white py-14 text-center shadow-[0_8px_24px_rgba(15,23,42,0.08)] dark:bg-zinc-800">
             <div className="text-5xl font-bold text-slate-800 dark:text-zinc-100">{word.term}</div>
+            {word.images && <WordImages images={word.images} />}
             {word.audio && (
               <button aria-label="播放发音"
                 className="mt-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-xl text-[#3b6ef5] shadow-[0_4px_12px_rgba(59,110,245,0.2)]"
