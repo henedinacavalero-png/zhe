@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "dev.pages.tangochou_1re.twa",
+        "sha256_cert_fingerprints": ["91:F5:E4:6B:00:54:3E:CA:40:82:07:0F:12:95:B3:19:D7:11:B5:60:81:A0:64:04:0D:A7:46:21:E9:36:10:A8"]
+      }
+    }]
