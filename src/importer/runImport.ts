@@ -103,15 +103,18 @@ export function attachFields(
       const value = (flds[j] ?? '').trim()
       if (!value) continue
       if (META_FIELD_RE.test(name)) continue
-      // 字段文本里引用的媒体（[sound:] / <img>）→ 收进 media 表（主音频由 word.audio 承担，不重复存）
-      const audioRef = value.match(/\[sound:([^\]]+)\]/)?.[1]
-      if (audioRef && audioRef !== audioName && mediaFiles.has(audioRef)) {
-        media[audioRef] = mediaFiles.get(audioRef)!
+      // 字段文本里引用的媒体（[sound:] / <img>）→ 收进 media 表（主音频 / 已挂图片除外，避免双份存储）
+      const audioRefs = [...value.matchAll(/\[sound:([^\]]+)\]/g)].map((m) => m[1])
+      for (const ref of audioRefs) {
+        if (ref !== audioName && mediaFiles.has(ref)) media[ref] = mediaFiles.get(ref)!
       }
-      for (const m of value.matchAll(/<img[^>]+src="([^"]+)"/gi)) {
-        const img = m[1]
-        if (mediaFiles.has(img)) media[img] = mediaFiles.get(img)!
+      const imgRefs = [...value.matchAll(IMG_SRC_RE)].map((m) => m[1])
+      for (const img of imgRefs) {
+        if (!words[i].images?.[img] && mediaFiles.has(img)) media[img] = mediaFiles.get(img)!
       }
+      // 整段只是媒体引用（如 JLab 的 Audio/Image 字段）且媒体都已挂载 → 不再重复成字段文本
+      const residual = value.replace(/\[sound:[^\]]*\]/g, '').replace(/<img\b[^>]*>/gi, '').replace(/<br\s*\/?>/gi, '').trim()
+      if (!residual && audioRefs.every((r) => r === audioName) && imgRefs.every((r) => words[i].images?.[r])) continue
       // 映射槽位（单词/读音/释义/例句/翻译）已在卡面单独展示，不进字段区
       if (usedSlots.has(j)) continue
       if (GUID_STR_RE.test(value)) continue
@@ -143,8 +146,9 @@ export async function runImport(
   const deckId = await db.decks.add({ name: deckName, importedAt: Date.now(), wordCount: 0 })
   const { words, audioNames, noteFields } = buildWords(raw.notes, guess, deckId)
   attachAudio(words, audioNames, raw.mediaFiles)
-  // 图片卡（如 Tae Kim 动漫句卡）：把每张卡 <img> 引用的图片 Blob 挂到 word.images
-  attachImages(words, noteFields, raw.mediaFiles)
+  // 图片卡（如 Tae Kim 动漫句卡）：noteFields 是字段原文，先提取每卡 <img> 引用的媒体名再按名挂 Blob
+  const imgNames = noteFields.map((flds) => collectImageNames(flds, raw.mediaFiles))
+  attachImages(words, imgNames, raw.mediaFiles)
   // 全字段快照 + 字段引用的其余媒体（背面完整展示；primary 音频仍走 word.audio）
   attachFields(words, noteFields, raw.models[0].fieldNames, guess, raw.mediaFiles)
 

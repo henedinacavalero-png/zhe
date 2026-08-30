@@ -79,4 +79,32 @@ describe('runImport 管线', () => {
     const last = calls[calls.length - 1]
     expect(last).toEqual([4, 4])
   })
+
+  test('runImport：图片卡挂载 word.images；已挂载的纯媒体字段（Audio/Image）不再重复进字段区', async () => {
+    const notes: RawNote[] = [
+      { mid: 1, fields: ['食べる', '<img src="pic.jpg">', '[sound:pop.mp3]', 'メモ', '解説テキスト'], tags: [] },
+    ]
+    const raw: RawApkg = {
+      models: [{ id: 1, name: 'JLab', fieldNames: ['単語', 'Image', 'Audio', '備考', '解説'] }],
+      notes,
+      mediaFiles: new Map([
+        ['pic.jpg', new Blob(['IMGDATA'])],
+        ['pop.mp3', new Blob(['MP3DATA'])],
+      ]),
+    }
+    const deckId = await runImport(
+      raw, { term: 0, reading: null, meaning: 3, example: null, exampleZh: null, exampleRt: null }, '图片牌组',
+      () => {},
+    )
+    const [w] = await db.words.where('deckId').equals(deckId).toArray()
+    // 图片：字段里 <img> 引用且媒体清单命中 → word.images 按文件名挂载（Tae Kim 动漫句卡）
+    expect(Object.keys(w.images ?? {})).toEqual(['pic.jpg'])
+    // 字段区：纯媒体引用字段已被卡面/图片区承担，不再重复；有实际文本的字段保留
+    const names = w.fields?.map((f) => f.name) ?? []
+    expect(names).not.toContain('Image')
+    expect(names).not.toContain('Audio')
+    expect(names).toContain('解説')
+    // 已挂进 word.images 的图片不重复存进 word.media（省 IndexedDB 空间）
+    expect(w.media ?? {}).not.toHaveProperty('pic.jpg')
+  })
 })
