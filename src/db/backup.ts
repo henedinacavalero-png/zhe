@@ -18,7 +18,7 @@ export async function decodeAudio(dataUrl: string): Promise<Blob> {
   return new Blob([buf], { type })
 }
 
-type WordWithoutMedia = Omit<Word, 'audio' | 'images'>
+type WordWithoutMedia = Omit<Word, 'audio' | 'images' | 'media'>
 
 interface Backup {
   version: 1
@@ -26,6 +26,7 @@ interface Backup {
   words: WordWithoutMedia[]
   audioByWordId: Record<string, string | undefined>
   imagesByWordId?: Record<string, Record<string, string> | undefined> // 文件名 → dataURL
+  mediaByWordId?: Record<string, Record<string, string> | undefined> // 其余媒体（例句音频等）
   progress: Progress[]
   settings: (AppSettings | Streak)[]
 }
@@ -36,18 +37,24 @@ export async function exportBackup(): Promise<Blob> {
   ])
   const audioByWordId: Record<string, string | undefined> = {}
   const imagesByWordId: Record<string, Record<string, string> | undefined> = {}
+  const mediaByWordId: Record<string, Record<string, string> | undefined> = {}
   const bareWords: WordWithoutMedia[] = []
   for (const w of words) {
-    const { audio, images, ...rest } = w
+    const { audio, images, media, ...rest } = w
     audioByWordId[String(w.id)] = audio ? await encodeAudio(audio) : undefined
     if (images && Object.keys(images).length) {
       const enc: Record<string, string> = {}
       for (const [name, blob] of Object.entries(images)) enc[name] = await encodeAudio(blob)
       imagesByWordId[String(w.id)] = enc
     }
+    if (media && Object.keys(media).length) {
+      const enc: Record<string, string> = {}
+      for (const [name, blob] of Object.entries(media)) enc[name] = await encodeAudio(blob)
+      mediaByWordId[String(w.id)] = enc
+    }
     bareWords.push(rest)
   }
-  const backup: Backup = { version: 1, decks, words: bareWords, audioByWordId, imagesByWordId, progress, settings }
+  const backup: Backup = { version: 1, decks, words: bareWords, audioByWordId, imagesByWordId, mediaByWordId, progress, settings }
   return new Blob([JSON.stringify(backup)], { type: 'application/json' })
 }
 

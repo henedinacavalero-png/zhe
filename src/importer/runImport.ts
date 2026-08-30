@@ -82,11 +82,56 @@ export function attachImages(words: Word[], noteImageNames: string[][], mediaFil
   }
 }
 
+const GUID_STR_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const META_FIELD_RE = /^(note id|link|version|sequence|order|totalorder|suborder)$/i
+
+/** 全字段快照（非空、剔除元数据列）+ 每卡引用媒体的 Blob 表（primary 音频以外） */
+export function attachFields(
+  words: Word[], noteFields: string[][], fieldNames: string[], guess: FieldGuess,
+  mediaFiles: Map<string, Blob>,
+): void {
+  const usedSlots = new Set(
+    [guess.term, guess.reading, guess.meaning, guess.example, guess.exampleZh].filter((x): x is number => x !== null),
+  )
+  for (let i = 0; i < words.length; i++) {
+    const flds = noteFields[i] ?? []
+    const snaps: { name: string; value: string }[] = []
+    const media: Record<string, Blob> = {}
+    const audioName = words[i].audioName
+    for (let j = 0; j < flds.length && j < fieldNames.length; j++) {
+      const name = fieldNames[j]
+      const value = (flds[j] ?? '').trim()
+      if (!value) continue
+      if (META_FIELD_RE.test(name)) continue
+      // 字段文本里引用的媒体（[sound:] / <img>）→ 收进 media 表（主音频由 word.audio 承担，不重复存）
+      const audioRef = value.match(/\[sound:([^\]]+)\]/)?.[1]
+      if (audioRef && audioRef !== audioName && mediaFiles.has(audioRef)) {
+        media[audioRef] = mediaFiles.get(audioRef)!
+      }
+      for (const m of value.matchAll(/<img[^>]+src="([^"]+)"/gi)) {
+        const img = m[1]
+        if (mediaFiles.has(img)) media[img] = mediaFiles.get(img)!
+      }
+      // 映射槽位（单词/读音/释义/例句/翻译）已在卡面单独展示，不进字段区
+      if (usedSlots.has(j)) continue
+      if (GUID_STR_RE.test(value)) continue
+      if (/^https?:\/\//i.test(value)) continue
+      if (/^\d{1,4}$/.test(value)) continue // 纯短数字（声调/序号）不成段
+      snaps.push({ name, value })
+    }
+    words[i].fields = snaps.length ? snaps : null
+    words[i].media = Object.keys(media).length ? media : null
+  }
+}
+
 /** 把媒体清单里的音频按 audioNames[i] ↔ words[i] 对齐挂载（裁定 1）；未命中保持 null */
 export function attachAudio(words: Word[], audioNames: (string | null)[], mediaFiles: Map<string, Blob>): void {
   for (let i = 0; i < words.length; i++) {
     const name = audioNames[i]
-    if (name && mediaFiles.has(name)) words[i].audio = mediaFiles.get(name)!
+    if (name && mediaFiles.has(name)) {
+      words[i].audio = mediaFiles.get(name)!
+      words[i].audioName = name
+    }
   }
 }
 
@@ -100,6 +145,8 @@ export async function runImport(
   attachAudio(words, audioNames, raw.mediaFiles)
   // 图片卡（如 Tae Kim 动漫句卡）：把每张卡 <img> 引用的图片 Blob 挂到 word.images
   attachImages(words, noteFields, raw.mediaFiles)
+  // 全字段快照 + 字段引用的其余媒体（背面完整展示；primary 音频仍走 word.audio）
+  attachFields(words, noteFields, raw.models[0].fieldNames, guess, raw.mediaFiles)
 
   const seeds: WordSeed[] = words.map((w, i) => ({ id: i, term: w.term, reading: w.reading, deckId, lesson: w.lesson }))
   const links = buildLinks(seeds) // seed.id 是词表内索引，与 Dexie 主键无关

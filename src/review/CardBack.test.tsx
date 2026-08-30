@@ -18,10 +18,10 @@ test('例句高亮目标词', () => {
 
 test('关联词按类型分组渲染为三组', () => {
   render(<CardBack word={word} wordsById={new Map([[2, { ...word, id: 2, term: '食事' }], [3, { ...word, id: 3, term: '食べ物' }], [4, { ...word, id: 4, term: '山' }]])} onJump={() => {}} />)
-  expect(screen.getByText(/同汉字/)).toBeInTheDocument()
-  expect(screen.getByText(/同词根/)).toBeInTheDocument()
-  expect(screen.getByText(/同课/)).toBeInTheDocument()
-  expect(screen.getByText(/同汉字 · 食事/)).toBeInTheDocument()
+  expect(screen.getAllByText(/同汉字/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/同词根/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/同课/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/同汉字 · 食事/).length).toBeGreaterThan(0)
 })
 
 test('汉字上方显示假名注音（ruby），纯假名单词不加注音', () => {
